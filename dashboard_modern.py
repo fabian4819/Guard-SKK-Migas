@@ -771,7 +771,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
 
                                 with row_cols[2]:
                                     if st.button("View", key=f"view_{idx}_{anomaly['timestamp']}",
-                                               use_container_width=True):
+                                               type="secondary", use_container_width=True):
                                         # Get corresponding row data
                                         row_idx = None
                                         for i, ts in enumerate(buffer_df['timestamp']):
@@ -899,3 +899,37 @@ else:
 # Footer
 st.divider()
 st.caption("🛡️ GUARD | SKK Migas")
+
+# Floating chatbot button (bottom right corner)
+st.markdown("""
+<style>
+    .chatbot-button {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        transition: all 0.3s ease;
+    }
+    .chatbot-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+    .chatbot-icon {
+        color: white;
+        font-size: 28px;
+    }
+</style>
+
+<div class="chatbot-button" onclick="alert('Chatbot feature - Coming soon!')">
+    <span class="chatbot-icon">💬</span>
+</div>
+""", unsafe_allow_html=True)
