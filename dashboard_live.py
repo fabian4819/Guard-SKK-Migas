@@ -49,26 +49,8 @@ st.subheader("BOOSTER COMPRESSOR B CPP DONGGI")
 with st.sidebar:
     st.header("⚙️ Live Demo Settings")
 
-    st.subheader("📅 Simulation Period")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input(
-            "Start Date",
-            value=datetime(2025, 8, 7),
-            min_value=datetime(2025, 1, 1),
-            max_value=datetime(2025, 12, 31),
-            key="start"
-        )
-
-    with col2:
-        end_date = st.date_input(
-            "End Date",
-            value=datetime(2025, 8, 15),
-            min_value=datetime(2025, 1, 1),
-            max_value=datetime(2025, 12, 31),
-            key="end"
-        )
+    st.subheader("📅 Data Source")
+    st.info("**Test.xlsx**\n14/4/2026 00:00 - 00:53\n(54 minutes, looping)")
 
     st.divider()
 
@@ -130,33 +112,59 @@ with st.sidebar:
     st.divider()
 
     st.caption(f"""
-    **Period:** {start_date} to {end_date}
+    **Data:** Test.xlsx (14/4/2026 00:00-00:53)
+    **Mode:** Infinite Loop
 
     **How it works:**
     1. Click ▶️ Start
-    2. Data plays forward in time
+    2. Data plays forward (54 min loop)
     3. Charts update live
     4. Anomalies detected → Alert + Email
+    5. Loops back to start automatically
 
     **Speed:** {speed_label}
     """)
 
 # Load processed data
 @st.cache_data
-def load_processed_data(start_date, end_date):
-    """Load real test data from notebook (NORMAL + ANOMALY)"""
+def load_processed_data():
+    """Load real-time test data from Test.xlsx (14/4/2026 00:00 - 00:53)"""
     from pathlib import Path
 
-    # Use actual test dataset from notebook
-    DATA_DIR = Path(__file__).parent / "KODE_FIX" / "KODE FIX"
-    df = pd.read_csv(DATA_DIR / "AnomalyDetected_Test.csv", parse_dates=['datetime'])
-    df = df.set_index('datetime')
+    # Load Test.xlsx
+    xlsx_path = Path(__file__).parent / "Test.xlsx"
+    df = pd.read_excel(xlsx_path)
 
-    # Filter to date range
-    mask = (df.index.date >= start_date) & (df.index.date <= end_date)
-    filtered = df[mask].copy()
+    # Parse datetime column
+    df['Datetime'] = pd.to_datetime(df['Datetime'], format='%d/%m/%Y %H:%M:%S')
+    df = df.set_index('Datetime')
 
-    return filtered
+    # Add status column (mock anomaly detection for demo)
+    # Mark as ANOMALY if any sensor reading is outside normal ranges
+    df['status'] = 'NORMAL'
+    df['MAE'] = np.random.uniform(0.5, 2.0, len(df))  # Mock MAE values
+
+    # Simple anomaly detection based on thresholds
+    anomaly_mask = (
+        (df['Flow_Rate'] < 45) | (df['Flow_Rate'] > 56) |
+        (df['Suction_Pressure'] < 33) | (df['Suction_Pressure'] > 34) |
+        (df['Discharge_Pressure'] < 60) | (df['Discharge_Pressure'] > 63.3) |
+        (df['Suction_Temperature'] < 90) | (df['Suction_Temperature'] > 100) |
+        (df['Discharge_Temperature'] < 189) | (df['Discharge_Temperature'] > 205)
+    )
+
+    df.loc[anomaly_mask, 'status'] = 'ANOMALY'
+    df.loc[anomaly_mask, 'MAE'] = np.random.uniform(3.0, 8.0, anomaly_mask.sum())
+
+    # Add other required columns
+    df['threshold_ratio'] = np.where(df['status'] == 'ANOMALY',
+                                      np.random.uniform(110, 150, len(df)),
+                                      np.random.uniform(50, 95, len(df)))
+    df['Gas_Loss_MMSCF'] = np.where(df['status'] == 'ANOMALY',
+                                     np.random.uniform(0.001, 0.01, len(df)),
+                                     0)
+
+    return df
 
 # Main content
 st.divider()
@@ -197,12 +205,12 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
 
     # Load processed data if not already loaded
     if st.session_state.full_data is None:
-        with st.spinner("📂 Loading processed data..."):
+        with st.spinner("📂 Loading Test.xlsx data..."):
             try:
-                processed_data = load_processed_data(start_date, end_date)
+                processed_data = load_processed_data()
 
                 if len(processed_data) == 0:
-                    st.error(f"No data available for {start_date} to {end_date}")
+                    st.error("No data available in Test.xlsx")
                     st.session_state.simulation_running = False
                     st.stop()
 
@@ -214,9 +222,10 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                 total = len(processed_data)
                 anomaly_rate = (anomaly_count / total * 100) if total > 0 else 0
 
-                st.success(f"✅ Loaded {total:,} data points: {normal_count:,} normal ({100-anomaly_rate:.1f}%), {anomaly_count:,} anomalies ({anomaly_rate:.1f}%)")
-                st.info("ℹ️ Using real test data from training notebook")
-                time.sleep(1)
+                st.success(f"✅ Loaded {total:,} data points from Test.xlsx")
+                st.info(f"📊 {normal_count:,} normal ({100-anomaly_rate:.1f}%), {anomaly_count:,} anomalies ({anomaly_rate:.1f}%)")
+                st.info("🔄 Data will loop continuously (54 minutes per cycle)")
+                time.sleep(2)
 
             except Exception as e:
                 st.error(f"Error loading data: {str(e)}")
@@ -229,8 +238,14 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
 
         data = st.session_state.full_data
 
-        while (st.session_state.current_index < len(data) and
-               st.session_state.simulation_running):
+        # Infinite loop with data wraparound
+        while st.session_state.simulation_running:
+
+            # Loop back to start if we reached the end
+            if st.session_state.current_index >= len(data):
+                st.session_state.current_index = 0
+                st.info("🔄 Looping back to start...")
+                time.sleep(0.5)
 
             # Get current row
             current_row = data.iloc[st.session_state.current_index]
@@ -470,36 +485,32 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
             # Rerun to update display
             st.rerun()
 
-        # Simulation complete
-        if st.session_state.current_index >= len(data):
-            st.session_state.simulation_running = False
-            st.success("✅ Simulation Complete!")
-            st.balloons()
-
 else:
     # Not running - show instructions
     st.info("""
-    ### 🎬 Live Demonstration Mode
+    ### 🎬 Live Looping Demo Mode
 
     **How to use:**
 
-    1. **Select date range** in sidebar (e.g., Aug 7-15, 2025)
-    2. **Choose playback speed** (Maximum Speed recommended for demo)
-    3. **Enable email alerts** if desired
-    4. **Click ▶️ Start** to begin live simulation
+    1. **Choose playback speed** in sidebar (Maximum Speed recommended)
+    2. **Enable email alerts** if desired
+    3. **Click ▶️ Start** to begin live simulation
 
     **What happens:**
-    - Data plays forward in real-time
+    - Data from Test.xlsx plays forward (14/4/2026 00:00 - 00:53)
     - Charts update live as time progresses
     - Anomalies detected automatically
-    - Email alerts sent instantly when anomaly found
-    - See the entire period unfold before your eyes!
+    - Email alerts sent when anomaly found
+    - **Loops continuously** - when reaching 00:53, jumps back to 00:00
+    - Runs infinitely until you click ⏸️ Stop
+
+    **Data:** 54 minutes of real sensor data, repeating in a loop
 
     **Tip:** Use Maximum Speed to see results quickly, or Real-time for dramatic effect.
     """)
 
 st.divider()
-st.caption("GUARD (Generative Understanding for Anomaly Response & Detection) | Real historical data, simulated live playback")
+st.caption("GUARD (Generative Understanding for Anomaly Response & Detection) | Test.xlsx data (14/4/2026), infinite loop mode")
 
 # Render floating chatbot
 render_chatbot()
