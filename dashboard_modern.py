@@ -41,6 +41,8 @@ if 'simulation_running' not in st.session_state:
     st.session_state.selected_equipment = 'MTD-340-C1001B'
     st.session_state.show_detail_modal = False
     st.session_state.selected_anomaly = None
+    st.session_state.last_rerun_time = time.time()
+    st.session_state.update_batch_size = 5  # Update UI every 5 data points
 
 # Custom CSS for modern design
 st.markdown("""
@@ -188,6 +190,25 @@ def load_data():
                                      np.random.uniform(0.001, 0.01, len(df)),
                                      0)
 
+    # Add deviation and contribution columns (required by email notifier)
+    sensors = {
+        'Flow_Rate': {'low': 45, 'high': 56},
+        'Suction_Pressure': {'low': 33, 'high': 34},
+        'Discharge_Pressure': {'low': 60, 'high': 63.3},
+        'Suction_Temperature': {'low': 90, 'high': 100},
+        'Discharge_Temperature': {'low': 189, 'high': 205},
+    }
+
+    for param, config in sensors.items():
+        expected = (config['low'] + config['high']) / 2
+        df[f'dev_{param}'] = df[param] - expected
+        dev_pct = (df[f'dev_{param}'] / expected * 100)
+        df[f'contrib_{param}'] = abs(dev_pct) / sum(
+            abs((df[p] - ((sensors[p]['low'] + sensors[p]['high']) / 2)) /
+                ((sensors[p]['low'] + sensors[p]['high']) / 2) * 100)
+            for p in sensors.keys()
+        ) * 100
+
     return df
 
 # Anomaly detail modal
@@ -195,21 +216,15 @@ def load_data():
 def show_anomaly_detail(anomaly_data, row_data=None):
     """Display detailed anomaly information matching email/PDF format"""
 
-    # Header Information (matching PDF format)
-    st.markdown("""
+    # Header Information
+    st.markdown(f"""
     <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-        <h3 style="color: white; margin: 0; text-align: center;">115-KOST CASE ANOMALI BOOSTER COMPRESSOR B CPP DONGGI</h3>
+        <h3 style="color: white; margin: 0; text-align: center;">ANOMALY DETECTION BOOSTER COMPRESSOR B CPP DONGGI</h3>
+        <p style="color: white; margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem; opacity: 0.9;">
+            {anomaly_data['timestamp'].strftime('%d %B %Y %H:%M:%S')} | CPP Donggi
+        </p>
     </div>
     """, unsafe_allow_html=True)
-
-    # Equipment Info
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**Model/System:** J.BEC-UAD")
-        st.markdown(f"**Equipment:** BOOSTER COMPRESSOR B CPP DONGGI")
-    with col2:
-        st.markdown(f"**Timestamp:** {anomaly_data['timestamp'].strftime('%d %B %Y %H:%M:%S')}")
-        st.markdown(f"**Location:** CPP Donggi")
 
     st.divider()
 
@@ -233,8 +248,8 @@ def show_anomaly_detail(anomaly_data, row_data=None):
 
     st.divider()
 
-    # Main Table: Top Contributing Variables (matching PDF format)
-    st.markdown("### 📊 VARIABLE ANALYSIS - TOP CONTRIBUTORS")
+    # Table 1: Top Contributing Variables - removed icon
+    st.markdown("### VARIABLE ANALYSIS - TOP CONTRIBUTORS")
 
     if row_data is not None:
         # Define sensor parameters with thresholds
@@ -299,20 +314,61 @@ def show_anomaly_detail(anomaly_data, row_data=None):
 
     st.divider()
 
-    # Action Buttons
-    col_close, col_export = st.columns(2)
-    with col_close:
-        if st.button("✖ Close", type="secondary", use_container_width=True):
-            st.rerun()
-    with col_export:
-        if st.button("📥 Export to PDF", type="primary", use_container_width=True):
-            st.info("PDF export feature - Coming soon!")
+    # Table 2: RCA Division Analysis (matching PDF second table)
+    st.markdown("### ROOT CAUSE ANALYSIS - PROBABLE SCENARIOS")
+
+    if row_data is not None:
+        from rca_knowledge_base import get_applicable_rca_scenarios
+
+        # Get RCA scenarios
+        scenarios = get_applicable_rca_scenarios(row_data, top_n=5)
+
+        if len(scenarios) > 0:
+            # Build RCA table data
+            rca_table_data = []
+
+            for scenario in scenarios:
+                vars_dict = scenario.get("variables", {})
+                rca_table_data.append({
+                    'DIVISION': scenario.get('division', ''),
+                    'PROB': scenario.get('id', '').split('-')[1] if '-' in scenario.get('id', '') else '',
+                    'RCA': scenario.get('rca', ''),
+                    'ACTIONS': scenario.get('actions', ''),
+                    'Flow Rate': 'YES' if vars_dict.get('Flow_Rate', False) else 'NO',
+                    'Suction Press': 'YES' if vars_dict.get('Suction_Pressure', False) else 'NO',
+                    'Discharge Press': 'YES' if vars_dict.get('Discharge_Pressure', False) else 'NO',
+                    'Suction Temp': 'YES' if vars_dict.get('Suction_Temperature', False) else 'NO',
+                    'Discharge Temp': 'YES' if vars_dict.get('Discharge_Temperature', False) else 'NO',
+                    'SYMPTOM': scenario.get('symptom', '')
+                })
+
+            # Display RCA table
+            df_rca = pd.DataFrame(rca_table_data)
+            st.dataframe(
+                df_rca,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "DIVISION": st.column_config.TextColumn("DIVISION", width="small"),
+                    "PROB": st.column_config.TextColumn("PROB", width="small"),
+                    "RCA": st.column_config.TextColumn("RCA", width="large"),
+                    "ACTIONS": st.column_config.TextColumn("ACTIONS", width="large"),
+                    "Flow Rate": st.column_config.TextColumn("Flow\nRate", width="small"),
+                    "Suction Press": st.column_config.TextColumn("Suction\nPress", width="small"),
+                    "Discharge Press": st.column_config.TextColumn("Discharge\nPress", width="small"),
+                    "Suction Temp": st.column_config.TextColumn("Suction\nTemp", width="small"),
+                    "Discharge Temp": st.column_config.TextColumn("Discharge\nTemp", width="small"),
+                    "SYMPTOM": st.column_config.TextColumn("SYMPTOM", width="medium"),
+                }
+            )
+        else:
+            st.info("No specific RCA scenarios matched. General investigation recommended.")
 
 # ========== SIDEBAR ==========
 with st.sidebar:
     st.markdown("### ⚙️ Control Panel")
 
-    st.markdown("**📊 Data Source**")
+    st.markdown("** Data Source**")
     st.info("Test.xlsx\n14/4/2026 00:00-00:53\n(Infinite loop)")
 
     st.divider()
@@ -399,33 +455,45 @@ with metric_col4:
     emails_display = st.empty()
 
 if not st.session_state.simulation_running:
-    current_time_display.markdown("""
-    <div class="metric-card">
-        <div class="metric-label">Current Time</div>
-        <div class="metric-value">Not Started</div>
-    </div>
-    """, unsafe_allow_html=True)
+    with current_time_display.container():
+        st.markdown("""
+        <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                    border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                        letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Current Time</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e3c72; line-height: 1;">Not Started</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    points_display.markdown("""
-    <div class="metric-card">
-        <div class="metric-label">Points Processed</div>
-        <div class="metric-value">0</div>
-    </div>
-    """, unsafe_allow_html=True)
+    with points_display.container():
+        st.markdown("""
+        <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                    border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                        letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Points Processed</div>
+            <div style="font-size: 2.5rem; font-weight: 700; color: #4caf50; line-height: 1;">0</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    anomalies_display.markdown("""
-    <div class="metric-card">
-        <div class="metric-label">Anomalies</div>
-        <div class="metric-value metric-value-warning">0</div>
-    </div>
-    """, unsafe_allow_html=True)
+    with anomalies_display.container():
+        st.markdown("""
+        <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                    border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                        letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Anomalies</div>
+            <div style="font-size: 2.5rem; font-weight: 700; color: #ff5722; line-height: 1;">0</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    emails_display.markdown("""
-    <div class="metric-card">
-        <div class="metric-label">Emails Sent</div>
-        <div class="metric-value metric-value-success">0</div>
-    </div>
-    """, unsafe_allow_html=True)
+    with emails_display.container():
+        st.markdown("""
+        <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                    border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                        letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Emails Sent</div>
+            <div style="font-size: 2.5rem; font-weight: 700; color: #4caf50; line-height: 1;">0</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.divider()
 
@@ -447,9 +515,8 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                 normal_count = len(df[df['status'] == 'NORMAL'])
                 total = len(df)
 
-                st.success(f"✅ Loaded {total:,} data points")
-                st.info(f"📊 {normal_count:,} normal, {anomaly_count:,} anomalies | 🔄 Looping mode")
-                time.sleep(2)
+                # Data loaded silently - removed display messages
+                time.sleep(0.5)
             except Exception as e:
                 st.error(f"Error: {e}")
                 st.session_state.simulation_running = False
@@ -482,6 +549,17 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                 'Discharge_Pressure': current_row['Discharge_Pressure'],
                 'Suction_Temperature': current_row['Suction_Temperature'],
                 'Discharge_Temperature': current_row['Discharge_Temperature'],
+                # Deviation and contribution columns for email notifier
+                'dev_Flow_Rate': current_row.get('dev_Flow_Rate', 0),
+                'dev_Suction_Pressure': current_row.get('dev_Suction_Pressure', 0),
+                'dev_Discharge_Pressure': current_row.get('dev_Discharge_Pressure', 0),
+                'dev_Suction_Temperature': current_row.get('dev_Suction_Temperature', 0),
+                'dev_Discharge_Temperature': current_row.get('dev_Discharge_Temperature', 0),
+                'contrib_Flow_Rate': current_row.get('contrib_Flow_Rate', 0),
+                'contrib_Suction_Pressure': current_row.get('contrib_Suction_Pressure', 0),
+                'contrib_Discharge_Pressure': current_row.get('contrib_Discharge_Pressure', 0),
+                'contrib_Suction_Temperature': current_row.get('contrib_Suction_Temperature', 0),
+                'contrib_Discharge_Temperature': current_row.get('contrib_Discharge_Temperature', 0),
             })
 
             # Keep only last 500 points to prevent memory buildup and freezing
@@ -523,38 +601,52 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                     'MAE': current_row['MAE']
                 })
 
-            # Update status metrics (update placeholders directly, no with-context)
-            current_time_display.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Current Time</div>
-                <div class="metric-value" style="font-size: 1.3rem;">{current_timestamp.strftime("%Y-%m-%d")}</div>
-                <div class="metric-value">{current_timestamp.strftime("%H:%M:%S")}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Update status metrics - styled cards matching image
+            with current_time_display.container():
+                date_str = current_timestamp.strftime("%Y-%m-%d")
+                time_str = current_timestamp.strftime("%H:%M:%S")
+                st.markdown(f"""
+                <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                            border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                                letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Current Time</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #1e3c72; line-height: 1.2;">{date_str}</div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: #1e3c72; line-height: 1.1;">{time_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            points_display.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Points Processed</div>
-                <div class="metric-value metric-value-success">{st.session_state.current_index + 1:,}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            with points_display.container():
+                points_val = st.session_state.current_index + 1
+                st.markdown(f"""
+                <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                            border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                                letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Points Processed</div>
+                    <div style="font-size: 2.5rem; font-weight: 700; color: #4caf50; line-height: 1;">{points_val:,}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             anomaly_count = len(st.session_state.anomalies_detected)
-            anomaly_color = "metric-value-danger" if anomaly_count > 0 else "metric-value"
-            anomalies_display.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Anomalies</div>
-                <div class="metric-value {anomaly_color}">{anomaly_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            with anomalies_display.container():
+                st.markdown(f"""
+                <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                            border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                                letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Anomalies</div>
+                    <div style="font-size: 2.5rem; font-weight: 700; color: #ff5722; line-height: 1;">{anomaly_count}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             emails_sent_count = len([e for e in st.session_state.emails_sent if e['status'] == 'Sent'])
-            emails_display.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Emails Sent</div>
-                <div class="metric-value metric-value-success">{emails_sent_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            with emails_display.container():
+                st.markdown(f"""
+                <div style="background: white; padding: 1.2rem; border-radius: 8px;
+                            border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="color: #888; font-size: 0.75rem; font-weight: 600;
+                                letter-spacing: 0.5px; margin-bottom: 0.5rem; text-transform: uppercase;">Emails Sent</div>
+                    <div style="font-size: 2.5rem; font-weight: 700; color: #4caf50; line-height: 1;">{emails_sent_count}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             # Update charts
             if len(st.session_state.data_buffer) > 0:
@@ -582,134 +674,112 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                         with stats_col3:
                             st.markdown(f'<div class="stats-card"><div class="stats-value">{anomaly_count}</div><div>Anomaly Count</div></div>', unsafe_allow_html=True)
 
-                        # Main chart
+                        # Main chart - optimized rendering
                         fig_main = go.Figure()
 
-                        # Area fill
+                        # Area fill - use fewer points if buffer is large
+                        plot_df = buffer_df if len(buffer_df) <= 200 else buffer_df.iloc[::2]  # Skip every other point if >200
+
                         fig_main.add_trace(go.Scatter(
-                            x=buffer_df['timestamp'],
-                            y=buffer_df['threshold_ratio'],
+                            x=plot_df['timestamp'],
+                            y=plot_df['threshold_ratio'],
                             fill='tozeroy',
                             fillcolor='rgba(66, 135, 245, 0.3)',
                             line=dict(color='rgba(66, 135, 245, 0.8)', width=2),
-                            name='Threshold Ratio'
+                            name='Threshold Ratio',
+                            hoverinfo='x+y'
                         ))
 
-                        # Trend line
-                        if len(buffer_df) > 3:
-                            z = np.polyfit(range(len(buffer_df)), buffer_df['threshold_ratio'], min(3, len(buffer_df)-1))
-                            p = np.poly1d(z)
-                            trend = p(range(len(buffer_df)))
-                            fig_main.add_trace(go.Scatter(
-                                x=buffer_df['timestamp'],
-                                y=trend,
-                                line=dict(color='#4caf50', width=3),
-                                name='Trend'
-                            ))
-
-                        # Anomaly markers
+                        # Anomaly markers only (removed trend line for performance)
                         anomalies_df = buffer_df[buffer_df['status'] == 'ANOMALY']
                         if len(anomalies_df) > 0:
                             fig_main.add_trace(go.Scatter(
                                 x=anomalies_df['timestamp'],
                                 y=anomalies_df['threshold_ratio'],
                                 mode='markers',
-                                marker=dict(size=15, color='#ff5722', line=dict(color='#d32f2f', width=2)),
-                                name='Anomaly'
+                                marker=dict(size=12, color='#ff5722', symbol='circle'),
+                                name='Anomaly',
+                                hoverinfo='x+y'
                             ))
 
                         # Current position
                         fig_main.add_scatter(
                             x=[current_timestamp],
                             y=[buffer_df['threshold_ratio'].iloc[-1]],
-                            mode='markers+text',
-                            marker=dict(color='green', size=15, symbol='triangle-up'),
-                            text=['NOW'],
-                            textposition='top center',
-                            showlegend=False
+                            mode='markers',
+                            marker=dict(color='green', size=12, symbol='triangle-up'),
+                            showlegend=False,
+                            hoverinfo='skip'
                         )
 
-                        fig_main.add_hline(y=100, line_dash="dash", line_color="#ff9800", annotation_text="Threshold")
+                        fig_main.add_hline(y=100, line_dash="dash", line_color="#ff9800",
+                                         annotation_text="Threshold", annotation_position="right")
 
                         fig_main.update_layout(
                             height=400,
-                            hovermode='x unified',
+                            hovermode='x',
                             showlegend=True,
                             legend=dict(orientation="h", yanchor="bottom", y=1.02),
                             margin=dict(l=20, r=20, t=40, b=20),
                             plot_bgcolor='white',
-                            xaxis=dict(gridcolor='#f0f0f0'),
-                            yaxis=dict(gridcolor='#f0f0f0', range=[0, max(120, buffer_df['threshold_ratio'].max() * 1.1)])
+                            xaxis=dict(gridcolor='#f0f0f0', showgrid=False),
+                            yaxis=dict(gridcolor='#f0f0f0', showgrid=True,
+                                     range=[0, max(120, buffer_df['threshold_ratio'].max() * 1.1)])
                         )
 
-                        st.plotly_chart(fig_main, use_container_width=True)
+                        st.plotly_chart(fig_main, use_container_width=True, key=f"main_chart_{st.session_state.current_index}")
 
                     with col_right:
                         st.markdown('<div class="section-header section-header-green">Anomaly History</div>', unsafe_allow_html=True)
 
                         if len(st.session_state.anomalies_detected) > 0:
-                            recent = st.session_state.anomalies_detected[-10:]
+                            # Show only last 5 anomalies to reduce rendering load
+                            recent = st.session_state.anomalies_detected[-5:]
 
-                            # Table header
+                            # Table header - matching image style
                             st.markdown("""
-                            <div style="display: grid; grid-template-columns: 3fr 2fr 1.5fr; gap: 1rem; padding: 0.8rem;
-                                        background: #f5f5f5; border-radius: 5px; font-weight: 600;
-                                        color: #333; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: 3fr 1.5fr 1.5fr; gap: 0.5rem;
+                                        padding: 0.5rem; background: #f5f5f5; font-weight: 600;
+                                        font-size: 0.85rem; color: #333; margin-bottom: 0.5rem;">
                                 <div>TIME</div>
-                                <div>RATIO</div>
+                                <div style="text-align: center;">RATIO</div>
                                 <div style="text-align: center;">ACTION</div>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # Table rows
+                            # Table rows - matching image format exactly
                             for idx, anomaly in enumerate(reversed(recent)):
-                                # Determine color based on severity
-                                if anomaly['threshold_ratio'] > 150:
-                                    ratio_color = "#d32f2f"  # Dark red - Critical
-                                    bg_color = "#ffebee"     # Light red background
-                                elif anomaly['threshold_ratio'] > 120:
-                                    ratio_color = "#f44336"  # Red - Warning
-                                    bg_color = "#fff3e0"     # Light orange background
-                                else:
-                                    ratio_color = "#ff9800"  # Orange - Caution
-                                    bg_color = "#ffffff"     # White background
+                                row_cols = st.columns([3, 1.5, 1.5])
 
-                                # Create row with columns (matching header proportions)
-                                col_time, col_ratio, col_action = st.columns([3, 2, 1.5])
+                                with row_cols[0]:
+                                    # Full timestamp with date and time like in image
+                                    full_time = anomaly['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+                                    st.markdown(f"<div style='font-size: 0.9rem; color: #333;'>{full_time}</div>",
+                                              unsafe_allow_html=True)
 
-                                with col_time:
-                                    st.markdown(f"""
-                                    <div style="padding: 0.5rem; color: #333; font-weight: 500; font-size: 0.9rem;">
-                                        {anomaly['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                                with row_cols[1]:
+                                    ratio_val = anomaly['threshold_ratio']
+                                    # Color coding based on severity
+                                    if ratio_val > 130:
+                                        color = "#d32f2f"  # Dark red
+                                    elif ratio_val > 120:
+                                        color = "#f44336"  # Red
+                                    else:
+                                        color = "#ff9800"  # Orange
+                                    st.markdown(f"<div style='text-align: center; font-weight: 700; font-size: 1rem; color: {color};'>{ratio_val:.1f}%</div>",
+                                              unsafe_allow_html=True)
 
-                                with col_ratio:
-                                    st.markdown(f"""
-                                    <div style="padding: 0.5rem; color: {ratio_color}; font-weight: 700;
-                                                font-size: 1.1rem;">
-                                        {anomaly['threshold_ratio']:.1f}%
-                                    </div>
-                                    """, unsafe_allow_html=True)
-
-                                with col_action:
-                                    if st.button("View", key=f"detail_{idx}_{anomaly['timestamp']}",
-                                               help="View Details", use_container_width=True, type="secondary"):
+                                with row_cols[2]:
+                                    if st.button("View", key=f"view_{idx}_{anomaly['timestamp']}",
+                                               use_container_width=True):
                                         # Get corresponding row data
                                         row_idx = None
                                         for i, ts in enumerate(buffer_df['timestamp']):
                                             if ts == anomaly['timestamp']:
                                                 row_idx = i
                                                 break
-
                                         row_data = buffer_df.iloc[row_idx] if row_idx is not None else None
                                         show_anomaly_detail(anomaly, row_data)
-
-                                # Row separator with color accent
-                                st.markdown(f"""
-                                <hr style="margin: 0.3rem 0; border: none;
-                                           border-top: 2px solid {bg_color};">
-                                """, unsafe_allow_html=True)
 
                         else:
                             st.info("No anomalies yet")
@@ -722,7 +792,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
-                        st.markdown("**📊 Flow Rate (MMSCFD)**")
+                        st.markdown("<b>Flow Rate (MMSCFD)</b>", unsafe_allow_html=True)
                         fig_flow = go.Figure()
                         fig_flow.add_trace(go.Scatter(
                             x=buffer_df['timestamp'],
@@ -736,7 +806,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                         st.plotly_chart(fig_flow, use_container_width=True)
 
                     with col2:
-                        st.markdown("**📊 Suction Pressure (barg)**")
+                        st.markdown("<b>Suction Pressure (barg)</b>", unsafe_allow_html=True)
                         fig_suction_pressure = go.Figure()
                         fig_suction_pressure.add_trace(go.Scatter(
                             x=buffer_df['timestamp'],
@@ -750,7 +820,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                         st.plotly_chart(fig_suction_pressure, use_container_width=True)
 
                     with col3:
-                        st.markdown("**📊 Discharge Pressure (barg)**")
+                        st.markdown("<b>Discharge Pressure (barg)</b>", unsafe_allow_html=True)
                         fig_discharge_pressure = go.Figure()
                         fig_discharge_pressure.add_trace(go.Scatter(
                             x=buffer_df['timestamp'],
@@ -765,7 +835,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                     col4, col5 = st.columns(2)
 
                     with col4:
-                        st.markdown("**📊 Suction Temperature (°C)**")
+                        st.markdown("<b>Suction Temperature (°C)</b>", unsafe_allow_html=True)
                         fig_suction_temp = go.Figure()
                         fig_suction_temp.add_trace(go.Scatter(
                             x=buffer_df['timestamp'],
@@ -779,7 +849,7 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                         st.plotly_chart(fig_suction_temp, use_container_width=True)
 
                     with col5:
-                        st.markdown("**📊 Discharge Temperature (°C)**")
+                        st.markdown("<b>Discharge Temperature (°C)</b>", unsafe_allow_html=True)
                         fig_discharge_temp = go.Figure()
                         fig_discharge_temp.add_trace(go.Scatter(
                             x=buffer_df['timestamp'],
@@ -793,7 +863,17 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
             # Move to next point
             st.session_state.current_index += 1
             time.sleep(st.session_state.simulation_speed)
-            st.rerun()
+
+            # Smart batching: Adjust update frequency based on simulation speed
+            # Real-time (1.0s): Update every point (no batching needed)
+            # Fast speeds (<0.5s): Batch updates to reduce chart re-rendering overhead
+            if st.session_state.simulation_speed >= 0.5:
+                # Real-time or slow speeds: Always update
+                st.rerun()
+            else:
+                # Fast speeds: Batch updates every N points to prevent buffering
+                if st.session_state.current_index % st.session_state.update_batch_size == 0:
+                    st.rerun()
 
 else:
     # Not running - show instructions in main container
@@ -818,4 +898,4 @@ else:
 
 # Footer
 st.divider()
-st.caption("🛡️ GUARD v2.0 | Pertamina EP Cepu | SKK Migas | Test.xlsx (14/4/2026) Infinite Loop")
+st.caption("🛡️ GUARD | SKK Migas")

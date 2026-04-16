@@ -117,6 +117,7 @@ def generate_rca_pdf(row: pd.Series, equipment_name: str = EQUIPMENT_NAME) -> by
     Returns PDF as bytes for email attachment.
     """
     from rca_knowledge_base import get_applicable_rca_scenarios, get_division_summary
+    from rule_engine import THRESHOLDS
 
     buffer = io.BytesIO()
 
@@ -140,7 +141,7 @@ def generate_rca_pdf(row: pd.Series, equipment_name: str = EQUIPMENT_NAME) -> by
     )
 
     # Title
-    title = Paragraph("115-KOST CASE ANOMALI BOOSTER COMPRESSOR B CPP DONGGI", title_style)
+    title = Paragraph("ANOMALY DETECTION BOOSTER COMPRESSOR B CPP DONGGI", title_style)
     elements.append(title)
     elements.append(Spacer(1, 0.15*inch))
 
@@ -152,8 +153,8 @@ def generate_rca_pdf(row: pd.Series, equipment_name: str = EQUIPMENT_NAME) -> by
         timestamp_str = str(timestamp)
 
     header_data = [
-        ["Model/System:", MODEL_SYSTEM, "Timestamp:", timestamp_str],
-        ["Equipment:", EQUIPMENT_NAME, "Location:", FIELD_NAME],
+        ["Equipment:", EQUIPMENT_NAME, "Timestamp:", timestamp_str],
+        ["Location:", FIELD_NAME, "", ""],
     ]
 
     header_table = Table(header_data, colWidths=[1*inch, 3.2*inch, 1*inch, 2.3*inch])
@@ -182,11 +183,24 @@ def generate_rca_pdf(row: pd.Series, equipment_name: str = EQUIPMENT_NAME) -> by
     ]
 
     for c in contributors:
-        # Determine abnormality status
-        if abs(c['deviation_pct']) > 10:
-            abnormality = "YES"
-        else:
-            abnormality = "NO"
+        # Determine abnormality status (matching modal view logic)
+        # Get threshold config for this variable
+        variable_name = c['variable']
+        threshold_config = THRESHOLDS.get(variable_name, {})
+
+        # Check if value is outside normal range
+        is_outside_range = False
+        if threshold_config:
+            low = threshold_config.get('low', 0)
+            high = threshold_config.get('high', 0)
+            is_outside_range = (c['value'] < low) or (c['value'] > high)
+
+        # Check for significant deviation or high contribution
+        is_significant_deviation = abs(c['deviation_pct']) > 2.0  # Lower threshold: 2% deviation
+        has_high_contribution = c['contribution'] > 20.0  # High contribution to loss
+
+        # Abnormality is YES if ANY condition is met
+        abnormality = "YES" if (is_outside_range or is_significant_deviation or has_high_contribution) else "NO"
 
         sensor_table_data.append([
             c['variable'].replace('_', ' '),

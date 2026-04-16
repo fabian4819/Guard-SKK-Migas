@@ -39,6 +39,8 @@ if 'simulation_running' not in st.session_state:
     st.session_state.emails_sent = []
     st.session_state.full_data = None
     st.session_state.simulation_speed = 1.0
+    st.session_state.last_rerun_time = time.time()
+    st.session_state.update_batch_size = 5  # Update UI every 5 data points
 
 # Title
 st.title("🛡️ GUARD Live Simulation - CPP Donggi")
@@ -164,6 +166,25 @@ def load_processed_data():
                                      np.random.uniform(0.001, 0.01, len(df)),
                                      0)
 
+    # Add deviation and contribution columns (required by email notifier)
+    sensors = {
+        'Flow_Rate': {'low': 45, 'high': 56},
+        'Suction_Pressure': {'low': 33, 'high': 34},
+        'Discharge_Pressure': {'low': 60, 'high': 63.3},
+        'Suction_Temperature': {'low': 90, 'high': 100},
+        'Discharge_Temperature': {'low': 189, 'high': 205},
+    }
+
+    for param, config in sensors.items():
+        expected = (config['low'] + config['high']) / 2
+        df[f'dev_{param}'] = df[param] - expected
+        dev_pct = (df[f'dev_{param}'] / expected * 100)
+        df[f'contrib_{param}'] = abs(dev_pct) / sum(
+            abs((df[p] - ((sensors[p]['low'] + sensors[p]['high']) / 2)) /
+                ((sensors[p]['low'] + sensors[p]['high']) / 2) * 100)
+            for p in sensors.keys()
+        ) * 100
+
     return df
 
 # Main content
@@ -216,16 +237,14 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
 
                 st.session_state.full_data = processed_data
 
-                # Count statuses
+                # Count statuses (silent load - no messages displayed)
                 anomaly_count = len(processed_data[processed_data['status'] == 'ANOMALY'])
                 normal_count = len(processed_data[processed_data['status'] == 'NORMAL'])
                 total = len(processed_data)
                 anomaly_rate = (anomaly_count / total * 100) if total > 0 else 0
 
-                st.success(f"✅ Loaded {total:,} data points from Test.xlsx")
-                st.info(f"📊 {normal_count:,} normal ({100-anomaly_rate:.1f}%), {anomaly_count:,} anomalies ({anomaly_rate:.1f}%)")
-                st.info("🔄 Data will loop continuously (54 minutes per cycle)")
-                time.sleep(2)
+                # Data loaded silently - removed display messages
+                time.sleep(0.5)
 
             except Exception as e:
                 st.error(f"Error loading data: {str(e)}")
@@ -261,6 +280,19 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
                 'Discharge_Pressure': current_row.get('Discharge_Pressure', 0),
                 'Suction_Temperature': current_row.get('Suction_Temperature', 0),
                 'Discharge_Temperature': current_row.get('Discharge_Temperature', 0),
+                'threshold_ratio': current_row.get('threshold_ratio', 0),
+                'Gas_Loss_MMSCF': current_row.get('Gas_Loss_MMSCF', 0),
+                # Deviation and contribution columns for email notifier
+                'dev_Flow_Rate': current_row.get('dev_Flow_Rate', 0),
+                'dev_Suction_Pressure': current_row.get('dev_Suction_Pressure', 0),
+                'dev_Discharge_Pressure': current_row.get('dev_Discharge_Pressure', 0),
+                'dev_Suction_Temperature': current_row.get('dev_Suction_Temperature', 0),
+                'dev_Discharge_Temperature': current_row.get('dev_Discharge_Temperature', 0),
+                'contrib_Flow_Rate': current_row.get('contrib_Flow_Rate', 0),
+                'contrib_Suction_Pressure': current_row.get('contrib_Suction_Pressure', 0),
+                'contrib_Discharge_Pressure': current_row.get('contrib_Discharge_Pressure', 0),
+                'contrib_Suction_Temperature': current_row.get('contrib_Suction_Temperature', 0),
+                'contrib_Discharge_Temperature': current_row.get('contrib_Discharge_Temperature', 0),
             })
 
             # Check for anomaly
@@ -482,8 +514,16 @@ if st.session_state.simulation_running or len(st.session_state.data_buffer) > 0:
             # Sleep based on speed
             time.sleep(st.session_state.simulation_speed)
 
-            # Rerun to update display
-            st.rerun()
+            # Smart batching: Adjust update frequency based on simulation speed
+            # Real-time (1.0s): Update every point (no batching needed)
+            # Fast speeds (<0.5s): Batch updates to reduce chart re-rendering overhead
+            if st.session_state.simulation_speed >= 0.5:
+                # Real-time or slow speeds: Always update
+                st.rerun()
+            else:
+                # Fast speeds: Batch updates every N points to prevent buffering
+                if st.session_state.current_index % st.session_state.update_batch_size == 0:
+                    st.rerun()
 
 else:
     # Not running - show instructions
@@ -510,7 +550,7 @@ else:
     """)
 
 st.divider()
-st.caption("GUARD (Generative Understanding for Anomaly Response & Detection) | Test.xlsx data (14/4/2026), infinite loop mode")
+st.caption("GUARD (Generative Understanding for Anomaly Response & Detection)")
 
 # Render floating chatbot
 render_chatbot()
