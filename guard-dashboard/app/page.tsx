@@ -16,9 +16,10 @@ export default function Dashboard() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dataBuffer, setDataBuffer] = useState<SensorData[]>([]);
   const [fullData, setFullData] = useState<SensorData[]>([]);
-  const [anomalies, setAnomalies] = useState<AnomalyAlert[]>([]);
-  const [speed, setSpeed] = useState(0.01); // Maximum speed default
-  const [enableEmail, setEnableEmail] = useState(false);
+  const [anomalies, setAnomalies] = useState<SensorData[]>([]);
+  const [speed] = useState(1.0); // Fixed to real-time 1x
+  const [enableEmail] = useState(true); // Always enabled
+  const [alertEmail, setAlertEmail] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     currentTime: 'Not Started',
@@ -27,34 +28,58 @@ export default function Dashboard() {
     emailsSent: 0,
   });
   const [dateRange, setDateRange] = useState({
-    startDate: '2025-08-07',
-    endDate: '2025-08-15',
+    startDate: '2026-04-14',
+    endDate: '2026-04-14',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const emailBatchRef = useRef<SensorData[]>([]);
+  const emailTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load data on mount and when date range changes
   useEffect(() => {
     loadData();
   }, [dateRange]);
 
-  // Simulation loop
+  // Simulation loop - Infinite looping like dashboard_modern.py
   useEffect(() => {
-    if (isRunning && currentIndex < fullData.length) {
+    if (isRunning && fullData.length > 0) {
       intervalRef.current = setTimeout(() => {
         processNextDataPoint();
       }, speed * 1000);
-    } else if (currentIndex >= fullData.length && isRunning) {
-      setIsRunning(false);
-      alert('✅ Simulation Complete!');
     }
 
     return () => {
       if (intervalRef.current) clearTimeout(intervalRef.current);
     };
   }, [isRunning, currentIndex, speed, fullData]);
+
+  // Email batching timer - sends batch every 30 seconds
+  useEffect(() => {
+    if (isRunning && enableEmail) {
+      // Set up 30-second timer
+      emailTimerRef.current = setInterval(() => {
+        if (emailBatchRef.current.length > 0) {
+          sendBatchEmailAlert(emailBatchRef.current);
+          emailBatchRef.current = []; // Clear batch after sending
+        }
+      }, 30000); // 30 seconds
+
+      return () => {
+        if (emailTimerRef.current) {
+          clearInterval(emailTimerRef.current);
+        }
+      };
+    } else {
+      // Clear timer if stopped or email disabled
+      if (emailTimerRef.current) {
+        clearInterval(emailTimerRef.current);
+        emailTimerRef.current = null;
+      }
+    }
+  }, [isRunning, enableEmail]);
 
   const loadData = async () => {
     setLoading(true);
@@ -78,23 +103,37 @@ export default function Dashboard() {
   };
 
   const processNextDataPoint = () => {
+    // Loop back to start if reached end
+    if (currentIndex >= fullData.length) {
+      setCurrentIndex(0);
+      return;
+    }
+
     const currentData = fullData[currentIndex];
     if (!currentData) return;
 
-    // Add to buffer
+    // Add to buffer (keep last 500 points)
     const newBuffer = [...dataBuffer, currentData];
+    if (newBuffer.length > 500) {
+      newBuffer.shift(); // Remove oldest
+    }
     setDataBuffer(newBuffer);
 
-    // Check for anomaly
+    // Check for anomaly - store full sensor data
     if (currentData.status === 'ANOMALY') {
-      const newAnomaly: AnomalyAlert = {
-        timestamp: currentData.datetime,
-        MAE: currentData.MAE,
-        threshold_ratio: currentData.threshold_ratio,
-        gas_loss: currentData.Gas_Loss_MMSCF,
-        emailStatus: 'Not Sent', // Simplified for now
-      };
-      setAnomalies((prev) => [...prev, newAnomaly]);
+      setAnomalies((prev) => {
+        const updated = [...prev, currentData];
+        // Keep last 100 anomalies
+        if (updated.length > 100) {
+          return updated.slice(-100);
+        }
+        return updated;
+      });
+
+      // Add to email batch if enabled (will be sent every 30 seconds)
+      if (enableEmail) {
+        emailBatchRef.current.push(currentData);
+      }
     }
 
     // Update stats
@@ -102,7 +141,7 @@ export default function Dashboard() {
       currentTime: new Date(currentData.datetime).toLocaleString(),
       pointsProcessed: currentIndex + 1,
       anomaliesDetected: anomalies.length + (currentData.status === 'ANOMALY' ? 1 : 0),
-      emailsSent: 0, // Simplified for now
+      emailsSent: 0, // Will be updated by email handler
     });
 
     setCurrentIndex((prev) => prev + 1);
@@ -113,6 +152,13 @@ export default function Dashboard() {
       alert('No data loaded. Please check the date range.');
       return;
     }
+
+    // Validate email (required)
+    if (!alertEmail || !alertEmail.includes('@')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
     setIsRunning(true);
   };
 
@@ -125,6 +171,7 @@ export default function Dashboard() {
     setCurrentIndex(0);
     setDataBuffer([]);
     setAnomalies([]);
+    emailBatchRef.current = []; // Clear email batch
     setStats({
       currentTime: 'Not Started',
       pointsProcessed: 0,
@@ -140,6 +187,37 @@ export default function Dashboard() {
     }
     setDateRange({ startDate, endDate });
     handleReset();
+  };
+
+  const sendBatchEmailAlert = async (anomalies: SensorData[]) => {
+    if (anomalies.length === 0) return;
+
+    // Validate email address
+    if (!alertEmail || !alertEmail.includes('@')) {
+      console.error('❌ Invalid email address');
+      return;
+    }
+
+    try {
+      console.log(`📧 Sending batch email with ${anomalies.length} anomal${anomalies.length > 1 ? 'ies' : 'y'}...`);
+
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anomalies, alertEmail }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setStats(prev => ({ ...prev, emailsSent: prev.emailsSent + 1 }));
+        console.log(`✅ Batch email sent successfully with ${anomalies.length} PDF attachment${anomalies.length > 1 ? 's' : ''}`);
+      } else {
+        console.error('❌ Failed to send batch email:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error sending batch email:', error);
+    }
   };
 
   if (loading) {
@@ -203,8 +281,8 @@ export default function Dashboard() {
       }`}>
         <div className="p-6 pt-4">
           {/* Sidebar Header with Close Button */}
-          <div className="flex items-center justify-between mb-6 pt-12">
-            <h3 className="text-sm font-bold text-gray-700">⚙️ Control Panel</h3>
+          <div className="flex items-center justify-between mb-8 pt-12">
+            <h2 className="text-2xl font-bold text-gray-900">Control Panel</h2>
             <button
               onClick={() => setSidebarOpen(false)}
               className="p-1 hover:bg-gray-100 rounded transition-colors lg:hidden"
@@ -214,106 +292,76 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Data Source Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-xs font-semibold text-blue-900 mb-1">📊 Data Source</p>
-            <p className="text-xs text-blue-700">Test.xlsx</p>
-            <p className="text-xs text-blue-600">14/4/2026 00:00-00:53</p>
-            <p className="text-xs text-blue-500">(Infinite loop)</p>
-          </div>
-
-          {/* Playback Speed */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-3">⚡ Playback Speed</label>
-            <select
-              value={speed}
-              onChange={(e) => setSpeed(parseFloat(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={1.0}>Real-time (1x)</option>
-              <option value={0.5}>2x Speed</option>
-              <option value={0.2}>5x Speed</option>
-              <option value={0.1}>10x Speed</option>
-              <option value={0.01}>Maximum Speed</option>
-            </select>
-          </div>
-
-          <div className="border-t border-gray-200 my-6"></div>
-
-          {/* Email Alerts */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-3">📧 Email Alerts</label>
-            <div className="flex items-center gap-2">
+          {/* Email Alert Configuration */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Email Alert</h3>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">Alert Email Address *</label>
               <input
-                type="checkbox"
-                checked={enableEmail}
-                onChange={(e) => setEnableEmail(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                type="email"
+                value={alertEmail}
+                onChange={(e) => setAlertEmail(e.target.value)}
+                placeholder="user@example.com"
+                className="w-full px-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-300 shadow-sm"
+                disabled={isRunning}
+                required
               />
-              <span className="text-sm text-gray-600">Send Email Alerts</span>
+              <p className="text-sm text-gray-500">
+                Alerts sent every 30s if anomalies detected
+              </p>
             </div>
-            {!enableEmail && (
-              <p className="text-xs text-orange-600 mt-2">⚠️ Email alerts disabled</p>
-            )}
           </div>
 
-          <div className="border-t border-gray-200 my-6"></div>
+          <div className="border-t border-gray-100 my-8"></div>
 
           {/* Control Buttons */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-2 gap-4 mb-8">
             <button
               onClick={handleStart}
               disabled={isRunning}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold text-lg transition-all active:scale-95 ${
                 isRunning
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
               }`}
             >
-              <Play size={16} />
               Start
             </button>
             <button
               onClick={handleStop}
               disabled={!isRunning}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold text-lg transition-all active:scale-95 ${
                 !isRunning
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              <Pause size={16} />
               Stop
             </button>
           </div>
 
-          <div className="border-t border-gray-200 my-6"></div>
-
           {/* Status */}
-          <div className={`p-4 rounded-lg ${isRunning ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-            <p className="text-sm font-bold">
-              {isRunning ? '🔴 LIVE - Running' : '⏹️ Stopped'}
-            </p>
+          <div className={`p-6 rounded-xl flex items-center justify-center gap-3 mb-8 border transition-all duration-500 ${
+            isRunning 
+              ? 'bg-green-50 border-green-100' 
+              : 'bg-gray-50 border-gray-100'
+          }`}>
+            <div className={`w-3 h-3 rounded ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+            <span className="text-xl font-bold text-gray-900">
+              {isRunning ? 'Running' : 'Stopped'}
+            </span>
           </div>
 
           {/* Instructions */}
-          <div className="mt-6 text-xs text-gray-600 space-y-2">
-            <p className="font-bold text-gray-700">How it works:</p>
-            <ol className="list-decimal list-inside space-y-1 text-gray-600">
-              <li>Click ▶️ Start</li>
-              <li>Data loops continuously</li>
-              <li>Charts update live</li>
-              <li>Anomalies → Email alerts</li>
+          <div className="pt-8 border-t border-gray-100">
+            <p className="text-sm font-bold text-gray-900 mb-4 tracking-tight uppercase">How it works:</p>
+            <ol className="space-y-3 text-sm text-gray-600 list-none pl-0">
+              <li>1. Enter your email address</li>
+              <li>2. Click Start</li>
+              <li>3. Data loops continuously</li>
+              <li>4. Charts update in real-time</li>
+              <li>5. Anomalies &#8594; Email alerts</li>
             </ol>
-            <p className="mt-3 text-gray-500">
-              <span className="font-semibold">Speed:</span> {
-                speed === 1.0 ? 'Real-time (1x)' :
-                speed === 0.5 ? '2x Speed' :
-                speed === 0.2 ? '5x Speed' :
-                speed === 0.1 ? '10x Speed' :
-                'Maximum Speed'
-              }
-            </p>
           </div>
         </div>
       </div>
@@ -387,21 +435,21 @@ export default function Dashboard() {
                 <div className="p-6">
                   {/* Stats Cards Row */}
                   <div className="grid grid-cols-3 gap-6 mb-6">
-                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-3xl font-bold text-blue-900 mb-1">
-                        {currentIndex > 0 ? (dataBuffer[dataBuffer.length - 1].threshold_ratio * (dataBuffer[dataBuffer.length - 1].threshold_ratio < 2 ? 100 : 1)).toFixed(1) : '---'}%
+                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-4xl font-bold text-[#1e40af] mb-2">
+                        {currentIndex > 0 ? dataBuffer[dataBuffer.length - 1].threshold_ratio.toFixed(1) : '0.0'}%
                       </p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Latest Ratio</p>
+                      <p className="text-xs text-gray-600 font-medium">Latest Ratio</p>
                     </div>
-                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-3xl font-bold text-red-600 mb-1">
-                        {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio * (a.threshold_ratio < 2 ? 100 : 1))).toFixed(1) : '---'}%
+                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-4xl font-bold text-[#dc2626] mb-2">
+                        {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio)).toFixed(1) : '0.0'}%
                       </p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Highest Ratio</p>
+                      <p className="text-xs text-gray-600 font-medium">Highest Ratio</p>
                     </div>
-                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-3xl font-bold text-blue-900 mb-1">{stats.anomaliesDetected}</p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Anomaly Count</p>
+                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-5xl font-bold text-[#1e40af] mb-2">{stats.anomaliesDetected}</p>
+                      <p className="text-xs text-gray-600 font-medium">Anomaly Count</p>
                     </div>
                   </div>
 
@@ -430,14 +478,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className={`px-6 pb-6 transition-all duration-300 ${
-          sidebarOpen ? 'pl-6' : 'pl-20'
-        }`}>
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-sm text-gray-500 text-center">🛡️ GUARD | SKK Migas</p>
-          </div>
-        </div>
       </div>
 
       {/* Chatbot - Keep as is */}

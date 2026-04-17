@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Pause, RotateCcw } from 'lucide-react';
 
 interface ControlPanelProps {
   onStart: () => void;
@@ -10,6 +9,10 @@ interface ControlPanelProps {
   isRunning: boolean;
   onSpeedChange: (speed: number) => void;
   onDateChange: (startDate: string, endDate: string) => void;
+  enableEmail: boolean;
+  onEnableEmailChange: (enabled: boolean) => void;
+  alertEmail: string;
+  onAlertEmailChange: (email: string) => void;
 }
 
 export default function ControlPanel({
@@ -19,6 +22,10 @@ export default function ControlPanel({
   isRunning,
   onSpeedChange,
   onDateChange,
+  enableEmail,
+  onEnableEmailChange,
+  alertEmail,
+  onAlertEmailChange,
 }: ControlPanelProps) {
   const [speed, setSpeed] = useState(0.01); // Maximum speed by default
   const [startDate, setStartDate] = useState('2025-08-07');
@@ -42,102 +49,77 @@ export default function ControlPanel({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">⚙️ Simulation Controls</h2>
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 max-w-md mx-auto">
+      <h2 className="text-2xl font-bold text-gray-900 mb-8">Control Panel</h2>
 
-      {/* Date Range */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">📅 Date Range</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isRunning}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isRunning}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleDateSubmit}
-              disabled={isRunning}
-              className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Apply
-            </button>
-          </div>
+      {/* Email Alert Section */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Email Alert</h3>
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Alert Email Address *
+          </label>
+          <input
+            type="email"
+            value={alertEmail}
+            onChange={(e) => onAlertEmailChange(e.target.value)}
+            placeholder="user@example.com"
+            title="Alert Email Address"
+            className="w-full px-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-300"
+            disabled={isRunning}
+          />
+          <p className="text-sm text-gray-500">
+            Alerts sent every 30s if anomalies detected
+          </p>
         </div>
       </div>
 
-      {/* Speed Control */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">⚡ Playback Speed</h3>
-        <select
-          value={speed}
-          onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          {speedOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="flex gap-3">
-        {!isRunning ? (
+      <div className="pt-6 border-t border-gray-100 mb-8">
+        <div className="grid grid-cols-2 gap-4">
           <button
             onClick={onStart}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-md hover:shadow-lg"
+            disabled={isRunning}
+            className={`flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold text-lg transition-all shadow-lg active:scale-95 ${
+              isRunning 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
+            }`}
           >
-            <Play size={20} />
-            Start Simulation
+            Start
           </button>
-        ) : (
           <button
             onClick={onStop}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold shadow-md hover:shadow-lg"
+            disabled={!isRunning}
+            className={`flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold text-lg transition-all active:scale-95 ${
+              !isRunning 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
           >
-            <Pause size={20} />
-            Stop Simulation
+            Stop
           </button>
-        )}
-        <button
-          onClick={onReset}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold shadow-md hover:shadow-lg"
-        >
-          <RotateCcw size={20} />
-          Reset
-        </button>
+        </div>
       </div>
 
-      {/* Status Indicator */}
-      <div className="mt-4">
-        {isRunning ? (
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <span className="inline-block w-3 h-3 bg-green-600 rounded-full animate-pulse"></span>
-            Simulation Running
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-gray-600 font-medium">
-            <span className="inline-block w-3 h-3 bg-gray-400 rounded-full"></span>
-            Simulation Stopped
-          </div>
-        )}
+      <div className="pt-6 border-t border-gray-100">
+        <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 flex items-center justify-center gap-3">
+          <div className={`w-3 h-3 rounded ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+          <span className="text-xl font-bold text-gray-900">
+            {isRunning ? 'Running' : 'Stopped'}
+          </span>
+        </div>
+      </div>
+
+      {/* How it works section */}
+      <div className="mt-8 pt-8 border-t border-gray-100">
+        <h4 className="text-sm font-bold text-gray-900 mb-4 tracking-tight uppercase">How it works:</h4>
+        <ol className="space-y-3 text-sm text-gray-600 list-none pl-0">
+          <li>1. Enter your email address</li>
+          <li>2. Click Start</li>
+          <li>3. Data loops continuously</li>
+          <li>4. Charts update in real-time</li>
+          <li>5. Anomalies &#8594; Email alerts</li>
+        </ol>
       </div>
     </div>
   );
