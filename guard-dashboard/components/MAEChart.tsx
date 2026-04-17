@@ -46,7 +46,7 @@ export default function MAEChart({ data, currentIndex }: MAEChartProps) {
               borderRadius: '8px',
               padding: '10px',
             }}
-            formatter={(value: any, name: string) => {
+            formatter={(value: any, name?: any) => {
               if (name === 'MAE') return [value.toFixed(4), 'MAE'];
               return [value, name];
             }}
