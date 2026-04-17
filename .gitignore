@@ -23,6 +23,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Exception: Allow Next.js lib directory
+!guard-dashboard/lib/
+
 # Virtual environments
 venv/
 ENV/
