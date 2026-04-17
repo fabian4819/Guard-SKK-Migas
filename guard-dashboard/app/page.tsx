@@ -8,7 +8,7 @@ import MAEChart from '@/components/MAEChart';
 import SensorChart from '@/components/SensorChart';
 import AlertsPanel from '@/components/AlertsPanel';
 import Chatbot from '@/components/Chatbot';
-import { Clock, Activity, AlertTriangle, Mail } from 'lucide-react';
+import { Clock, Activity, AlertTriangle, Mail, Play, Pause, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
   // State
@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [fullData, setFullData] = useState<SensorData[]>([]);
   const [anomalies, setAnomalies] = useState<AnomalyAlert[]>([]);
   const [speed, setSpeed] = useState(0.01); // Maximum speed default
+  const [enableEmail, setEnableEmail] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     currentTime: 'Not Started',
     pointsProcessed: 0,
@@ -170,105 +172,275 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f2f5] font-sans">
-      {/* Main Header - LEADS-Inspired */}
-      <div className="mx-4 mt-4 mb-6">
-        <div className="bg-[#1e3c72] p-8 rounded-xl shadow-lg relative overflow-hidden group transition-all duration-300">
-          <div className="relative z-10">
-            <h1 className="text-white text-5xl font-black tracking-widest uppercase drop-shadow-md">
-              GUARD
-            </h1>
-            <p className="text-white text-md font-medium mt-4">
-              Generative Understanding for Anomaly Response & Detection - Machine Learning Based Early Warning System
+    <div className="min-h-screen bg-gray-50 font-sans">
+      {/* Sidebar Toggle Button - Fixed on top left */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className={`fixed top-4 z-50 p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 ${
+          sidebarOpen ? 'left-[304px]' : 'left-4'
+        }`}
+        aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+        title={sidebarOpen ? "Hide Control Panel" : "Show Control Panel"}
+      >
+        {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+        {/* Status indicator when sidebar is closed */}
+        {!sidebarOpen && isRunning && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse border-2 border-white"></span>
+        )}
+      </button>
+
+      {/* Sidebar Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed left-0 top-0 h-full w-80 bg-white border-r border-gray-200 overflow-y-auto z-40 shadow-lg transition-transform duration-300 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6 pt-4">
+          {/* Sidebar Header with Close Button */}
+          <div className="flex items-center justify-between mb-6 pt-12">
+            <h3 className="text-sm font-bold text-gray-700">⚙️ Control Panel</h3>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 hover:bg-gray-100 rounded transition-colors lg:hidden"
+              aria-label="Close sidebar"
+            >
+              <X size={18} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Data Source Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-xs font-semibold text-blue-900 mb-1">📊 Data Source</p>
+            <p className="text-xs text-blue-700">Test.xlsx</p>
+            <p className="text-xs text-blue-600">14/4/2026 00:00-00:53</p>
+            <p className="text-xs text-blue-500">(Infinite loop)</p>
+          </div>
+
+          {/* Playback Speed */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-3">⚡ Playback Speed</label>
+            <select
+              value={speed}
+              onChange={(e) => setSpeed(parseFloat(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={1.0}>Real-time (1x)</option>
+              <option value={0.5}>2x Speed</option>
+              <option value={0.2}>5x Speed</option>
+              <option value={0.1}>10x Speed</option>
+              <option value={0.01}>Maximum Speed</option>
+            </select>
+          </div>
+
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Email Alerts */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-3">📧 Email Alerts</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={enableEmail}
+                onChange={(e) => setEnableEmail(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600">Send Email Alerts</span>
+            </div>
+            {!enableEmail && (
+              <p className="text-xs text-orange-600 mt-2">⚠️ Email alerts disabled</p>
+            )}
+          </div>
+
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Control Buttons */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button
+              onClick={handleStart}
+              disabled={isRunning}
+              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                isRunning
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+              }`}
+            >
+              <Play size={16} />
+              Start
+            </button>
+            <button
+              onClick={handleStop}
+              disabled={!isRunning}
+              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                !isRunning
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'
+              }`}
+            >
+              <Pause size={16} />
+              Stop
+            </button>
+          </div>
+
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Status */}
+          <div className={`p-4 rounded-lg ${isRunning ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+            <p className="text-sm font-bold">
+              {isRunning ? '🔴 LIVE - Running' : '⏹️ Stopped'}
+            </p>
+          </div>
+
+          {/* Instructions */}
+          <div className="mt-6 text-xs text-gray-600 space-y-2">
+            <p className="font-bold text-gray-700">How it works:</p>
+            <ol className="list-decimal list-inside space-y-1 text-gray-600">
+              <li>Click ▶️ Start</li>
+              <li>Data loops continuously</li>
+              <li>Charts update live</li>
+              <li>Anomalies → Email alerts</li>
+            </ol>
+            <p className="mt-3 text-gray-500">
+              <span className="font-semibold">Speed:</span> {
+                speed === 1.0 ? 'Real-time (1x)' :
+                speed === 0.5 ? '2x Speed' :
+                speed === 0.2 ? '5x Speed' :
+                speed === 0.1 ? '10x Speed' :
+                'Maximum Speed'
+              }
             </p>
           </div>
         </div>
       </div>
 
-      <main className="px-6 pb-12">
+      {/* Main Content */}
+      <div className={`min-h-screen transition-all duration-300 ease-in-out ${
+        sidebarOpen ? 'ml-80' : 'ml-0'
+      }`}>
+        {/* Header */}
+        <div className={`px-6 pt-6 pb-4 transition-all duration-300 ${
+          sidebarOpen ? 'pl-6' : 'pl-20'
+        }`}>
+          <div className="bg-gradient-to-r from-[#1e3c72] to-[#2a5298] p-6 rounded-xl shadow-md">
+            <h1 className="text-white text-4xl font-black tracking-[0.15em] uppercase"
+                style={{ textShadow: '3px 3px 8px rgba(0,0,0,0.5)' }}>
+              GUARD
+            </h1>
+            <p className="text-white text-base mt-2 opacity-95"
+               style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.4)' }}>
+              Generative Understanding for Anomaly Response & Detection - Machine Learning Based Early Warning System
+            </p>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className={`px-6 transition-all duration-300 ${
+          sidebarOpen ? 'pl-6' : 'pl-20'
+        }`}>
+          <div className="border-t border-gray-200 my-4"></div>
+        </div>
+
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <StatsCard
-            title="Current Time"
-            value={stats.currentTime === 'Not Started' ? '2026-04-14\n00:00:21' : stats.currentTime.replace(', ', '\n')}
-            color="primary"
-          />
-          <StatsCard
-            title="Points Processed"
-            value={stats.pointsProcessed}
-            color="success"
-          />
-          <StatsCard
-            title="Anomalies"
-            value={stats.anomaliesDetected}
-            color="danger"
-          />
-          <StatsCard
-            title="Emails Sent"
-            value={stats.emailsSent}
-            color="success"
-          />
-        </div>
-
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-9 space-y-10">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-orange-500 px-6 py-3 text-white font-black text-md uppercase tracking-wide">
-                Threshold Ratio Analysis
-              </div>
-              <div className="p-8">
-                <div className="grid grid-cols-3 gap-8 mb-10">
-                  <div className="border-l-4 border-blue-600 pl-6">
-                    <p className="text-4xl font-black text-blue-900 mb-2">
-                       {currentIndex > 0 ? (dataBuffer[dataBuffer.length - 1].threshold_ratio * (dataBuffer[dataBuffer.length - 1].threshold_ratio < 2 ? 100 : 1)).toFixed(1) : '---'}%
-                    </p>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Latest Ratio</p>
-                  </div>
-                  <div className="border-l-4 border-orange-500 pl-6">
-                    <p className="text-4xl font-black text-red-600 mb-2">
-                      {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio * (a.threshold_ratio < 2 ? 100 : 1))).toFixed(1) : '---'}%
-                    </p>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Highest Ratio</p>
-                  </div>
-                  <div className="border-l-4 border-blue-900 pl-6">
-                    <p className="text-4xl font-black text-blue-900 mb-2">{stats.anomaliesDetected}</p>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Anomaly Count</p>
-                  </div>
-                </div>
-                
-                <div className="h-[400px]">
-                  <MAEChart data={dataBuffer} currentIndex={currentIndex - 1} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
-               <SensorChart data={dataBuffer} />
-            </div>
+        <div className={`px-6 pb-6 transition-all duration-300 ${
+          sidebarOpen ? 'pl-6' : 'pl-20'
+        }`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <StatsCard
+              title="Current Time"
+              value={stats.currentTime === 'Not Started' ? '2026-04-14\n00:00:21' : stats.currentTime.replace(', ', '\n')}
+              color="primary"
+            />
+            <StatsCard
+              title="Points Processed"
+              value={stats.pointsProcessed}
+              color="success"
+            />
+            <StatsCard
+              title="Anomalies"
+              value={stats.anomaliesDetected}
+              color="danger"
+            />
+            <StatsCard
+              title="Emails Sent"
+              value={stats.emailsSent}
+              color="success"
+            />
           </div>
 
-          <div className="lg:col-span-3 space-y-8">
-            <AlertsPanel alerts={anomalies} />
-            
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
-                <Activity size={18} className="text-blue-600" />
-                <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest">Control Panel</h3>
+          {/* Divider */}
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Main Dashboard Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Main Charts - 8 columns */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Threshold Ratio Analysis */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-3">
+                  <h2 className="text-white font-semibold text-base">Threshold Ratio Analysis</h2>
+                </div>
+                <div className="p-6">
+                  {/* Stats Cards Row */}
+                  <div className="grid grid-cols-3 gap-6 mb-6">
+                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-3xl font-bold text-blue-900 mb-1">
+                        {currentIndex > 0 ? (dataBuffer[dataBuffer.length - 1].threshold_ratio * (dataBuffer[dataBuffer.length - 1].threshold_ratio < 2 ? 100 : 1)).toFixed(1) : '---'}%
+                      </p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Latest Ratio</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-3xl font-bold text-red-600 mb-1">
+                        {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio * (a.threshold_ratio < 2 ? 100 : 1))).toFixed(1) : '---'}%
+                      </p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Highest Ratio</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-3xl font-bold text-blue-900 mb-1">{stats.anomaliesDetected}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Anomaly Count</p>
+                    </div>
+                  </div>
+
+                  {/* Chart */}
+                  <div className="h-[400px]">
+                    <MAEChart data={dataBuffer} currentIndex={currentIndex - 1} />
+                  </div>
+                </div>
               </div>
-              <ControlPanel
-                onStart={handleStart}
-                onStop={handleStop}
-                onReset={handleReset}
-                isRunning={isRunning}
-                onSpeedChange={setSpeed}
-                onDateChange={handleDateChange}
-              />
+
+              {/* Sensor Monitoring */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-3">
+                  <h2 className="text-white font-semibold text-base">Equipment Sensor Monitoring</h2>
+                </div>
+                <div className="p-6">
+                  <SensorChart data={dataBuffer} />
+                </div>
+              </div>
+            </div>
+
+            {/* Alerts Panel - 4 columns */}
+            <div className="lg:col-span-4">
+              <AlertsPanel alerts={anomalies} />
             </div>
           </div>
         </div>
-      </main>
 
+        {/* Footer */}
+        <div className={`px-6 pb-6 transition-all duration-300 ${
+          sidebarOpen ? 'pl-6' : 'pl-20'
+        }`}>
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm text-gray-500 text-center">🛡️ GUARD | SKK Migas</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Chatbot - Keep as is */}
       <Chatbot data={dataBuffer} />
     </div>
   );

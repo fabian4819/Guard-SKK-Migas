@@ -1,6 +1,6 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area } from 'recharts';
 import { SensorData } from '@/types';
 import { format } from 'date-fns';
 
@@ -8,74 +8,129 @@ interface SensorChartProps {
   data: SensorData[];
 }
 
-export default function SensorChart({ data }: SensorChartProps) {
-  const chartData = data.map((item) => ({
-    time: format(new Date(item.datetime), 'HH:mm'),
-    'Flow Rate': item.Flow_Rate,
-    'Suction Pressure': item.Suction_Pressure,
-    'Discharge Pressure': item.Discharge_Pressure,
-    'Suction Temp': item.Suction_Temperature,
-    'Discharge Temp': item.Discharge_Temperature,
-  }));
-
-  const sensors = [
-    { key: 'Flow Rate', color: '#1976d2' },
-    { key: 'Suction Pressure', color: '#ff9800' },
-    { key: 'Discharge Pressure', color: '#4caf50' },
-    { key: 'Suction Temp', color: '#9c27b0' },
-    { key: 'Discharge Temp', color: '#f44336' },
-  ];
+function MiniSensorChart({ data, dataKey, color, title, unit }: {
+  data: any[],
+  dataKey: string,
+  color: string,
+  title: string,
+  unit: string
+}) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[280px] flex items-center justify-center text-gray-400">
+        <p className="text-sm">No data</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">📊 Live Sensor Readings</h2>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+    <div>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title} ({unit})</h3>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+          <defs>
+            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.2}/>
+              <stop offset="95%" stopColor={color} stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
           <XAxis
             dataKey="time"
-            stroke="#666"
-            tick={{ fontSize: 12 }}
+            stroke="#999"
+            tick={{ fontSize: 10 }}
+            tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            stroke="#666"
-            tick={{ fontSize: 12 }}
-            label={{ value: 'Value', angle: -90, position: 'insideLeft' }}
+            stroke="#999"
+            tick={{ fontSize: 10 }}
+            tickLine={false}
+            width={40}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: 'white',
-              border: '1px solid #ccc',
-              borderRadius: '8px',
-              padding: '10px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '11px',
             }}
-            formatter={(value: any) => value.toFixed(2)}
+            formatter={(value: any) => [Number(value).toFixed(2), title]}
           />
-          <Legend
-            wrapperStyle={{ paddingTop: '20px' }}
-            iconType="line"
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            fill={`url(#gradient-${dataKey})`}
+            stroke="none"
           />
-
-          {sensors.map((sensor) => (
-            <Line
-              key={sensor.key}
-              type="monotone"
-              dataKey={sensor.key}
-              stroke={sensor.color}
-              strokeWidth={2}
-              dot={false}
-              name={sensor.key}
-            />
-          ))}
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke={color}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-        {sensors.map((sensor) => (
-          <div key={sensor.key} className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sensor.color }}></div>
-            <span className="text-gray-700">{sensor.key}</span>
-          </div>
+    </div>
+  );
+}
+
+export default function SensorChart({ data }: SensorChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-center text-gray-400 py-12">
+        <p>No sensor data available. Start the simulation to begin monitoring.</p>
+      </div>
+    );
+  }
+
+  const chartData = data.map((item) => ({
+    time: format(new Date(item.datetime), 'HH:mm:ss'),
+    flowRate: item.Flow_Rate,
+    suctionPressure: item.Suction_Pressure,
+    dischargePressure: item.Discharge_Pressure,
+    suctionTemp: item.Suction_Temperature,
+    dischargeTemp: item.Discharge_Temperature,
+  }));
+
+  const sensors = [
+    { dataKey: 'flowRate', color: '#ff9800', title: 'Flow Rate', unit: 'MMSCFD' },
+    { dataKey: 'suctionPressure', color: '#2196f3', title: 'Suction Pressure', unit: 'barg' },
+    { dataKey: 'dischargePressure', color: '#ff5722', title: 'Discharge Pressure', unit: 'barg' },
+    { dataKey: 'suctionTemp', color: '#4caf50', title: 'Suction Temperature', unit: '°C' },
+    { dataKey: 'dischargeTemp', color: '#9c27b0', title: 'Discharge Temperature', unit: '°C' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Row 1: 3 sensors */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {sensors.slice(0, 3).map((sensor) => (
+          <MiniSensorChart
+            key={sensor.dataKey}
+            data={chartData}
+            dataKey={sensor.dataKey}
+            color={sensor.color}
+            title={sensor.title}
+            unit={sensor.unit}
+          />
+        ))}
+      </div>
+
+      {/* Row 2: 2 sensors */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {sensors.slice(3, 5).map((sensor) => (
+          <MiniSensorChart
+            key={sensor.dataKey}
+            data={chartData}
+            dataKey={sensor.dataKey}
+            color={sensor.color}
+            title={sensor.title}
+            unit={sensor.unit}
+          />
         ))}
       </div>
     </div>

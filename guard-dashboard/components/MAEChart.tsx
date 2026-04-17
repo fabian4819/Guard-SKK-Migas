@@ -1,6 +1,6 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Scatter, ScatterChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area } from 'recharts';
 import { SensorData } from '@/types';
 import { format } from 'date-fns';
 
@@ -10,98 +10,87 @@ interface MAEChartProps {
 }
 
 export default function MAEChart({ data, currentIndex }: MAEChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400">
+        <p>No data available</p>
+      </div>
+    );
+  }
+
   const chartData = data.map((item, index) => ({
-    time: format(new Date(item.datetime), 'HH:mm'),
+    time: format(new Date(item.datetime), 'HH:mm:ss'),
     fullDate: item.datetime,
-    MAE: item.MAE,
+    threshold_ratio: item.threshold_ratio * (item.threshold_ratio < 2 ? 100 : 1),
     status: item.status,
     isAnomaly: item.status === 'ANOMALY',
-    isCurrent: index === currentIndex,
   }));
 
-  const anomalies = chartData.filter(d => d.isAnomaly);
-  const currentPoint = currentIndex !== undefined ? chartData[currentIndex] : null;
-
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">📈 Live Anomaly Detection - MAE Timeline</h2>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-          <XAxis
-            dataKey="time"
-            stroke="#666"
-            tick={{ fontSize: 12 }}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            stroke="#666"
-            tick={{ fontSize: 12 }}
-            label={{ value: 'MAE', angle: -90, position: 'insideLeft' }}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #ccc',
-              borderRadius: '8px',
-              padding: '10px',
-            }}
-            formatter={(value: any, name?: any) => {
-              if (name === 'MAE') return [value.toFixed(4), 'MAE'];
-              return [value, name];
-            }}
-            labelFormatter={(label) => `Time: ${label}`}
-          />
-          <Legend />
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorThreshold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="rgba(66, 135, 245, 0.3)" stopOpacity={0.8}/>
+            <stop offset="95%" stopColor="rgba(66, 135, 245, 0.3)" stopOpacity={0}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+        <XAxis
+          dataKey="time"
+          stroke="#999"
+          tick={{ fontSize: 11 }}
+          tickLine={false}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          stroke="#999"
+          tick={{ fontSize: 11 }}
+          tickLine={false}
+          domain={[0, 'auto']}
+        />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'white',
+            border: '1px solid #e0e0e0',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontSize: '12px',
+          }}
+          formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Threshold Ratio']}
+          labelStyle={{ color: '#666', fontWeight: 600 }}
+        />
 
-          {/* MAE Line */}
-          <Line
-            type="monotone"
-            dataKey="MAE"
-            stroke="#1976d2"
-            strokeWidth={2}
-            dot={false}
-            name="MAE"
-          />
+        {/* Threshold line at 100% */}
+        <ReferenceLine y={100} stroke="#ff9800" strokeDasharray="3 3" strokeWidth={2} />
 
-          {/* Anomaly Points */}
-          {anomalies.map((anomaly, index) => (
-            <Scatter
-              key={`anomaly-${index}`}
-              data={[anomaly]}
-              fill="#f44336"
-              shape="cross"
-              name={index === 0 ? 'Anomaly' : ''}
-            />
-          ))}
+        {/* Area fill */}
+        <Area
+          type="monotone"
+          dataKey="threshold_ratio"
+          fill="url(#colorThreshold)"
+          stroke="none"
+        />
 
-          {/* Current Position */}
-          {currentPoint && (
-            <Scatter
-              data={[currentPoint]}
-              fill="#4caf50"
-              shape="triangle"
-              name="Current"
-            />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="mt-4 flex gap-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-0.5 bg-blue-600"></div>
-          <span>MAE Value</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-red-600">✕</span>
-          <span>Anomaly Detected</span>
-        </div>
-        {currentIndex !== undefined && (
-          <div className="flex items-center gap-2">
-            <span className="text-green-600">▲</span>
-            <span>Current Position</span>
-          </div>
-        )}
-      </div>
-    </div>
+        {/* Main line */}
+        <Line
+          type="monotone"
+          dataKey="threshold_ratio"
+          stroke="rgba(66, 135, 245, 0.8)"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 6, fill: '#4287f5' }}
+        />
+
+        {/* Anomaly markers */}
+        <Line
+          type="monotone"
+          dataKey={(entry) => entry.isAnomaly ? entry.threshold_ratio : null}
+          stroke="none"
+          dot={{ r: 6, fill: '#ff5722', strokeWidth: 0 }}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
