@@ -1,40 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as nodemailer from 'nodemailer';
 import { generateRCAPDF } from '@/lib/pdfGenerator';
-import PdfPrinter from 'pdfmake';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 
-// Fonts configuration for pdfmake
-const fonts = {
-  Helvetica: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique'
-  }
-};
+// Initialize pdfMake with fonts
+pdfMake.vfs = pdfFonts.pdfMake.vfs;
 
 async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
       const docDefinition = generateRCAPDF(anomalyData);
-      const printer = new PdfPrinter(fonts);
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
 
-      const chunks: Buffer[] = [];
-
-      pdfDoc.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
+      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+        resolve(buffer);
       });
-
-      pdfDoc.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
-
-      pdfDoc.on('error', (error: Error) => {
-        reject(error);
-      });
-
-      pdfDoc.end();
     } catch (error) {
       reject(error);
     }

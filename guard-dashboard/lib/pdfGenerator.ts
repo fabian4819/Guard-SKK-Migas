@@ -260,9 +260,6 @@ export function generateRCAPDF(anomalyData: SensorData): TDocumentDefinitions {
         bold: true,
       },
     },
-    defaultStyle: {
-      font: 'Helvetica',
-    },
   };
 
   return docDefinition;
