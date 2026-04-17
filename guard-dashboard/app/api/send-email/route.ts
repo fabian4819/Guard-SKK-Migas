@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as nodemailer from 'nodemailer';
 import { generateRCAPDF } from '@/lib/pdfGenerator';
 import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
+import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Initialize pdfMake with fonts (type assertions needed for vfs)
-(pdfMake as any).vfs = (pdfFonts as any).pdfMake.vfs;
+(pdfMake as any).vfs = pdfFonts.pdfMake?.vfs || (pdfFonts as any).vfs;
 
 async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
