@@ -10,32 +10,29 @@ interface StatsCardProps {
 
 export default function StatsCard({ title, value, icon, trend, color = 'primary' }: StatsCardProps) {
   const colorClasses = {
-    primary: 'bg-blue-50 border-blue-200 text-blue-700',
-    success: 'bg-green-50 border-green-200 text-green-700',
-    danger: 'bg-red-50 border-red-200 text-red-700',
-    warning: 'bg-orange-50 border-orange-200 text-orange-700',
+    primary: 'text-blue-900',
+    success: 'text-green-700',
+    danger: 'text-red-600',
+    warning: 'text-orange-700',
   };
 
   return (
-    <div className={`rounded-lg border-2 p-6 ${colorClasses[color]} transition-all hover:shadow-lg`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium opacity-70">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
+    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm transition-all hover:shadow-md h-full">
+      <div className="flex flex-col h-full">
+        <p className="text-[12px] font-black uppercase tracking-widest text-[#94a3b8] mb-6">{title}</p>
+        <div className="mt-auto">
+          <div className="whitespace-pre-line text-[#1e3c72] leading-tight font-black tracking-tight">
+            {typeof value === 'string' && value.includes('\n') ? (
+              <>
+                <div className="text-2xl opacity-80 mb-1">{value.split('\n')[0]}</div>
+                <div className="text-4xl">{value.split('\n')[1]}</div>
+              </>
+            ) : (
+              <span className="text-3xl">{value}</span>
+            )}
+          </div>
         </div>
-        {icon && <div className="text-4xl opacity-50">{icon}</div>}
       </div>
-      {trend && (
-        <div className="mt-3 text-xs">
-          <span className={`inline-flex items-center ${
-            trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-600'
-          }`}>
-            {trend === 'up' && '↑'}
-            {trend === 'down' && '↓'}
-            {trend === 'neutral' && '→'}
-          </span>
-        </div>
-      )}
     </div>
   );
 }

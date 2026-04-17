@@ -170,108 +170,105 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-8">
-          <h1 className="text-4xl font-bold mb-2">🛡️ GUARD Live Dashboard</h1>
-          <p className="text-lg opacity-90">
-            Generative Understanding for Anomaly Response & Detection
-          </p>
-          <p className="text-sm opacity-75 mt-1">BOOSTER COMPRESSOR B - CPP DONGGI</p>
+    <div className="min-h-screen bg-[#f0f2f5] font-sans">
+      {/* Main Header - LEADS-Inspired */}
+      <div className="mx-4 mt-4 mb-6">
+        <div className="bg-[#1e3c72] p-8 rounded-xl shadow-lg relative overflow-hidden group transition-all duration-300">
+          <div className="relative z-10">
+            <h1 className="text-white text-5xl font-black tracking-widest uppercase drop-shadow-md">
+              GUARD
+            </h1>
+            <p className="text-white text-md font-medium mt-4">
+              Generative Understanding for Anomaly Response & Detection - Machine Learning Based Early Warning System
+            </p>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        {/* Control Panel */}
-        <ControlPanel
-          onStart={handleStart}
-          onStop={handleStop}
-          onReset={handleReset}
-          isRunning={isRunning}
-          onSpeedChange={setSpeed}
-          onDateChange={handleDateChange}
-        />
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <main className="px-6 pb-12">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <StatsCard
             title="Current Time"
-            value={stats.currentTime}
-            icon={<Clock />}
+            value={stats.currentTime === 'Not Started' ? '2026-04-14\n00:00:21' : stats.currentTime.replace(', ', '\n')}
             color="primary"
           />
           <StatsCard
             title="Points Processed"
-            value={stats.pointsProcessed.toLocaleString()}
-            icon={<Activity />}
+            value={stats.pointsProcessed}
             color="success"
           />
           <StatsCard
-            title="Anomalies Detected"
+            title="Anomalies"
             value={stats.anomaliesDetected}
-            icon={<AlertTriangle />}
             color="danger"
           />
           <StatsCard
             title="Emails Sent"
             value={stats.emailsSent}
-            icon={<Mail />}
-            color="warning"
+            color="success"
           />
         </div>
 
-        {/* Charts */}
-        <div className="space-y-6 mb-8">
-          <MAEChart data={dataBuffer} currentIndex={currentIndex - 1} />
-          <SensorChart data={dataBuffer} />
-        </div>
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-9 space-y-10">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-orange-500 px-6 py-3 text-white font-black text-md uppercase tracking-wide">
+                Threshold Ratio Analysis
+              </div>
+              <div className="p-8">
+                <div className="grid grid-cols-3 gap-8 mb-10">
+                  <div className="border-l-4 border-blue-600 pl-6">
+                    <p className="text-4xl font-black text-blue-900 mb-2">
+                       {currentIndex > 0 ? (dataBuffer[dataBuffer.length - 1].threshold_ratio * (dataBuffer[dataBuffer.length - 1].threshold_ratio < 2 ? 100 : 1)).toFixed(1) : '---'}%
+                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Latest Ratio</p>
+                  </div>
+                  <div className="border-l-4 border-orange-500 pl-6">
+                    <p className="text-4xl font-black text-red-600 mb-2">
+                      {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio * (a.threshold_ratio < 2 ? 100 : 1))).toFixed(1) : '---'}%
+                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Highest Ratio</p>
+                  </div>
+                  <div className="border-l-4 border-blue-900 pl-6">
+                    <p className="text-4xl font-black text-blue-900 mb-2">{stats.anomaliesDetected}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Anomaly Count</p>
+                  </div>
+                </div>
+                
+                <div className="h-[400px]">
+                  <MAEChart data={dataBuffer} currentIndex={currentIndex - 1} />
+                </div>
+              </div>
+            </div>
 
-        {/* Alerts Panel */}
-        <AlertsPanel alerts={anomalies} />
-
-        {/* Info Box */}
-        {!isRunning && dataBuffer.length === 0 && (
-          <div className="mt-8 bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
-            <h3 className="text-xl font-bold text-blue-900 mb-3">🎬 Live Demonstration Mode</h3>
-            <div className="text-blue-800 space-y-2">
-              <p className="font-semibold">How to use:</p>
-              <ol className="list-decimal list-inside space-y-1 ml-4">
-                <li>Select date range in control panel (default: Aug 7-15, 2025)</li>
-                <li>Choose playback speed (Maximum Speed recommended for demo)</li>
-                <li>Click "Start Simulation" to begin live playback</li>
-              </ol>
-              <p className="font-semibold mt-4">What happens:</p>
-              <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Data plays forward in real-time</li>
-                <li>Charts update live as time progresses</li>
-                <li>Anomalies detected automatically</li>
-                <li>See the entire period unfold before your eyes!</li>
-              </ul>
-              <p className="mt-4 text-sm">
-                <strong>Loaded:</strong> {fullData.length.toLocaleString()} data points from{' '}
-                {dateRange.startDate} to {dateRange.endDate}
-              </p>
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
+               <SensorChart data={dataBuffer} />
             </div>
           </div>
-        )}
+
+          <div className="lg:col-span-3 space-y-8">
+            <AlertsPanel alerts={anomalies} />
+            
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
+                <Activity size={18} className="text-blue-600" />
+                <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest">Control Panel</h3>
+              </div>
+              <ControlPanel
+                onStart={handleStart}
+                onStop={handleStop}
+                onReset={handleReset}
+                isRunning={isRunning}
+                onSpeedChange={setSpeed}
+                onDateChange={handleDateChange}
+              />
+            </div>
+          </div>
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-gray-800 text-gray-300 mt-12">
-        <div className="container mx-auto px-6 py-6 text-center">
-          <p className="text-sm">
-            GUARD (Generative Understanding for Anomaly Response & Detection) | Real historical
-            data, simulated live playback
-          </p>
-          <p className="text-xs mt-2 opacity-75">
-            Built with Next.js, React, and TailwindCSS
-          </p>
-        </div>
-      </footer>
-
-      {/* Chatbot */}
       <Chatbot data={dataBuffer} />
     </div>
   );
