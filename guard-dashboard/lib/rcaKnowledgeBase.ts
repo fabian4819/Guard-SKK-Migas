@@ -41,6 +41,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'INS-02',
     division: 'INSTRUMENT',
+    division_code: 305,
+    color: '#DDEBF7',
     prob: '2',
     variable: 'Suction Pressure Transmitter (PT) Dysfunction',
     rca: 'PT failure causing inaccurate suction pressure data',
@@ -56,6 +58,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'INS-03',
     division: 'INSTRUMENT',
+    division_code: 305,
+    color: '#DDEBF7',
     prob: '3',
     variable: 'Discharge Pressure Transmitter (PT) Malfunction',
     rca: 'Faulty discharge PT causing incorrect pressure readings',
@@ -71,6 +75,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'INS-04',
     division: 'INSTRUMENT',
+    division_code: 305,
+    color: '#DDEBF7',
     prob: '4',
     variable: 'Suction Temperature Transmitter (TT) Malfunction',
     rca: 'TT failure or calibration issue affecting temperature readings',
@@ -88,6 +94,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-01',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '1',
     variable: 'Compressor Valve (ACHP) Actuator',
     rca: 'Faulty actuator affecting valve operation and flow control',
@@ -103,6 +111,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-02',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '2',
     variable: 'Gas Cooler / Heat Exchanger Efficiency',
     rca: 'Fouling or reduced heat transfer in cooler/exchanger',
@@ -118,6 +128,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-03',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '3',
     variable: 'Downstream Filter/Valve Malfunction',
     rca: 'Blocked or malfunctioning filter causing flow restriction',
@@ -133,6 +145,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-04',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '4',
     variable: 'Anti-Surge Control Valve Stuck',
     rca: 'ASV stuck affecting surge protection and flow',
@@ -148,6 +162,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-05',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '5',
     variable: 'Gas Condensate & Impurity Density Builds',
     rca: 'Condensate accumulation affecting flow and efficiency',
@@ -163,6 +179,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-06',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '6',
     variable: 'Suction & Scrubber Leak Analysis',
     rca: 'Leak in suction system reducing pressure',
@@ -178,6 +196,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'PRO-07',
     division: 'PROCESS',
+    division_code: 306,
+    color: '#E2EFDA',
     prob: '7',
     variable: 'Lube-Gas Temperature Check',
     rca: 'Abnormal lube gas temperature affecting lubrication',
@@ -195,6 +215,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'MEC-01',
     division: 'MECHANICAL',
+    division_code: 307,
+    color: '#FFF2CC',
     prob: '1',
     variable: 'Compressor Internal (Impeller/Diffuser) Evaluation',
     rca: 'Impeller wear or damage reducing compression efficiency',
@@ -210,6 +232,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'MEC-02',
     division: 'MECHANICAL',
+    division_code: 307,
+    color: '#FFF2CC',
     prob: '2',
     variable: 'Discharge Piston/Valve (APV) Inspection',
     rca: 'Faulty piston or valve affecting discharge performance',
@@ -225,6 +249,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'MEC-03',
     division: 'MECHANICAL',
+    division_code: 307,
+    color: '#FFF2CC',
     prob: '3',
     variable: 'Gas Seals/Physical Inspection',
     rca: 'Seal leakage causing pressure loss',
@@ -240,6 +266,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'MEC-04',
     division: 'MECHANICAL',
+    division_code: 307,
+    color: '#FFF2CC',
     prob: '4',
     variable: 'Suction Strainer Check',
     rca: 'Clogged strainer restricting flow',
@@ -255,6 +283,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'MEC-05',
     division: 'MECHANICAL',
+    division_code: 307,
+    color: '#FFF2CC',
     prob: '5',
     variable: 'Compressor & Motor Bearings Temperature Check',
     rca: 'Bearing wear causing temperature rise',
@@ -272,6 +302,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'ELE-01',
     division: 'ELECTRICAL',
+    division_code: 308,
+    color: '#FCE4D6',
     prob: '1',
     variable: 'Coupling & Gearbox Inspection',
     rca: 'Coupling misalignment or gearbox issue',
@@ -287,6 +319,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'ELE-02',
     division: 'ELECTRICAL',
+    division_code: 308,
+    color: '#FCE4D6',
     prob: '2',
     variable: 'Main Drive Motor Current & Voltage Evaluation',
     rca: 'Abnormal motor current or voltage affecting performance',
@@ -302,6 +336,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'ELE-03',
     division: 'ELECTRICAL',
+    division_code: 308,
+    color: '#FCE4D6',
     prob: '3',
     variable: 'Variable Speed Drive (VSD) / Inverter Inspection',
     rca: 'VSD malfunction affecting speed control',
@@ -317,6 +353,8 @@ export const rcaKnowledgeBase: RCAScenario[] = [
   {
     id: 'ELE-04',
     division: 'ELECTRICAL',
+    division_code: 308,
+    color: '#FCE4D6',
     prob: '4',
     variable: 'Motor Winding Temperature Check',
     rca: 'High motor winding temperature indicating overload or cooling issue',
