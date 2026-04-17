@@ -13,7 +13,8 @@ async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
       const docDefinition = generateRCAPDF(anomalyData);
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
 
-      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+      // Type assertion needed as TypeScript definitions don't match runtime API
+      (pdfDocGenerator as any).getBuffer((buffer: Buffer) => {
         resolve(buffer);
       });
     } catch (error) {
