@@ -5,7 +5,7 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Initialize pdfMake with fonts (type assertions needed for vfs)
-(pdfMake as any).vfs = pdfFonts.pdfMake?.vfs || (pdfFonts as any).vfs;
+(pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs;
 
 async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
