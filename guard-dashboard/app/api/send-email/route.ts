@@ -4,8 +4,8 @@ import { generateRCAPDF } from '@/lib/pdfGenerator';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 
-// Initialize pdfMake with fonts
-pdfMake.vfs = pdfFonts.pdfMake.vfs;
+// Initialize pdfMake with fonts (type assertion needed for vfs)
+(pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
 
 async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
