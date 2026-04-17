@@ -281,14 +281,20 @@ export default function Dashboard() {
       }`}>
         <div className="p-6 pt-4">
           {/* Sidebar Header with Close Button */}
-          <div className="flex items-center justify-between mb-8 pt-12">
-            <h2 className="text-2xl font-bold text-gray-900">Control Panel</h2>
+          <div className="flex items-center justify-between mb-10 pt-12">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1">System Navigation</span>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                Control <span className="text-blue-600">Panel</span>
+              </h2>
+              <div className="h-1 w-12 bg-blue-600 mt-2 rounded-full"></div>
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded transition-colors lg:hidden"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
               aria-label="Close sidebar"
             >
-              <X size={18} className="text-gray-500" />
+              <X size={20} className="text-gray-500" />
             </button>
           </div>
 
