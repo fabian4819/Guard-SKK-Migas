@@ -1,18 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { MessageCircle, X, Send, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { MessageCircle, X, Send, Trash2, Bot, User, Sparkles, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { SensorData } from '@/types';
 
 // Simple markdown renderer for chat messages
 function renderMarkdown(text: string) {
   let html = text;
 
+  // Code blocks: ```code``` -> <pre>code</pre>
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 p-2 rounded my-2 font-mono text-xs overflow-x-auto">$1</pre>');
+
   // Bold text: **text** -> <strong>text</strong>
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-blue-700">$1</strong>');
 
   // Bullet points: - item -> • item
-  html = html.replace(/^- (.*)/gm, '• $1');
+  html = html.replace(/^- (.*)/gm, '<li class="ml-4 list-disc">$1</li>');
+  if (html.includes('<li')) {
+    // Wrap groups of li in ul if needed, but this is simple
+  }
 
   // Newlines
   html = html.replace(/\n/g, '<br/>');
@@ -32,17 +38,28 @@ interface ChatbotProps {
 
 export default function Chatbot({ data }: ChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: '👋 Halo! Saya Asisten GUARD, didukung oleh AI. Saya memiliki pengetahuan mendalam tentang sistem GUARD, semua 32 skenario RCA, dan dapat membantu Anda menganalisis anomali. Tanyakan apa saja tentang sistem atau data Anda!',
+      content: '👋 **Halo! Saya Asisten GUARD.**\n\nSaya didukung oleh AI untuk membantu Anda memantau sistem. Saya memiliki pengetahuan mendalam tentang:\n- Semua 32 skenario RCA\n- Analisis anomali LSTM\n- Data sensor real-time\n\nApa yang bisa saya bantu hari ini?',
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
       role: 'user',
@@ -53,11 +70,12 @@ export default function Chatbot({ data }: ChatbotProps) {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
+    setIsLoading(true);
 
     // Add thinking indicator
     const thinkingMessage: Message = {
       role: 'assistant',
-      content: '🤔 Sedang berpikir...',
+      content: '✨ Sedang menganalisis...',
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages((prev) => [...prev, thinkingMessage]);
@@ -81,10 +99,8 @@ export default function Chatbot({ data }: ChatbotProps) {
           content: result.message,
           timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         };
-        // Replace thinking message with actual response
         setMessages((prev) => [...prev.slice(0, -1), botMessage]);
       } else {
-        // Error handling - fallback to local response
         const fallbackResponse = generateResponse(input, data);
         const botMessage: Message = {
           role: 'assistant',
@@ -95,7 +111,6 @@ export default function Chatbot({ data }: ChatbotProps) {
       }
     } catch (error) {
       console.error('Chat error:', error);
-      // Fallback to local response on error
       const fallbackResponse = generateResponse(input, data);
       const botMessage: Message = {
         role: 'assistant',
@@ -103,6 +118,8 @@ export default function Chatbot({ data }: ChatbotProps) {
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev.slice(0, -1), botMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -110,11 +127,18 @@ export default function Chatbot({ data }: ChatbotProps) {
     setMessages([
       {
         role: 'assistant',
-        content: '👋 Percakapan dibersihkan! Saya siap membantu Anda dengan analisis RCA, penjelasan anomali, kueri data sensor, atau pertanyaan tentang sistem GUARD.',
+        content: '🧹 **Percakapan dibersihkan!**\n\nSaya siap membantu Anda kembali dengan analisis RCA atau kueri data sensor GUARD.',
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
   };
+
+  const suggestions = [
+    "Tampilkan statistik",
+    "Anomali terbaru",
+    "Jelaskan MAE",
+    "Sensor yang dipantau"
+  ];
 
   return (
     <>
@@ -122,99 +146,157 @@ export default function Chatbot({ data }: ChatbotProps) {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center animate-pulse hover:animate-none"
+          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-2 border-white/20 hover:scale-105 active:scale-95 transition-all z-50 flex items-center justify-center group"
           aria-label="Open chat"
         >
-          <MessageCircle size={28} />
+          <div className="absolute inset-0 rounded-full bg-blue-400 blur-sm opacity-0 group-hover:opacity-40 transition-opacity animate-pulse"></div>
+          <MessageCircle size={30} className="relative z-10" />
         </button>
       )}
 
       {/* Chat Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-5 flex items-center justify-between">
+        <div className={`fixed z-50 transition-all duration-300 ease-in-out flex flex-col shadow-2xl overflow-hidden
+          ${isMinimized 
+            ? 'bottom-6 right-6 w-72 h-14' 
+            : 'bottom-6 right-6 w-[400px] h-[650px] max-h-[calc(100vh-40px)] rounded-2xl border border-gray-100'
+          } bg-white`}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white px-4 py-3 flex items-center justify-between shrink-0 cursor-pointer"
+               onClick={() => isMinimized && setIsMinimized(false)}>
+            <div className="flex items-center gap-3">
               <div>
-                <h3 className="text-xl font-bold">GUARD Assistant</h3>
-                <p className="text-sm opacity-90">RCA Expert • Real-time Analysis</p>
+                <h3 className="text-sm font-bold tracking-tight">GUARD AI Assistant</h3>
+                {!isMinimized && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                    <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">Online • RCA Specialist</span>
+                  </div>
+                )}
               </div>
+            </div>
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                title={isMinimized ? "Expand" : "Minimize"}
+              >
+                {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                 aria-label="Close chat"
               >
-                <X size={24} />
+                <X size={18} />
               </button>
             </div>
+          </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+          {!isMinimized && (
+            <>
+              {/* Messages Container */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8fafc] scrollbar-thin scrollbar-thumb-gray-200">
+                {messages.map((message, index) => (
                   <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-md ${
-                      message.role === 'user'
-                        ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-br-sm'
-                        : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
-                    }`}
+                    key={index}
+                    className={`flex items-end gap-2 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                   >
+                    {/* Avatar */}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm
+                      ${message.role === 'user' 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-indigo-600 text-white'}`}
+                    >
+                      {message.role === 'user' ? <User size={14} /> : <Sparkles size={14} />}
+                    </div>
+
                     <div
-                      className="text-sm leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
-                      style={{
-                        wordWrap: 'break-word',
-                        overflowWrap: 'break-word',
-                      }}
-                    />
-                    <p
-                      className={`text-xs mt-2 ${
-                        message.role === 'user' ? 'text-white text-opacity-70' : 'text-gray-500'
+                      className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm text-sm border
+                        ${message.role === 'user'
+                          ? 'bg-blue-600 text-white border-blue-500 rounded-br-none'
+                          : 'bg-white text-gray-800 border-gray-100 rounded-bl-none'
+                        }`}
+                    >
+                      <div
+                        className="leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
+                      />
+                      <p
+                        className={`text-[10px] mt-2 font-medium ${
+                          message.role === 'user' ? 'text-blue-10' : 'text-gray-400'
+                        }`}
+                      >
+                        {message.timestamp}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Suggestions */}
+              <div className="px-4 py-2 bg-[#f8fafc] border-t border-gray-100 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                <div className="flex gap-2">
+                  {suggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setInput(suggestion); }}
+                      className="inline-block px-3 py-1.5 bg-white border border-gray-200 hover:border-blue-300 hover:text-blue-600 rounded-full text-xs font-medium text-gray-600 transition-all shadow-sm active:scale-95"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Area */}
+              <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+                <div className="flex gap-2 items-center bg-gray-50 border border-gray-200 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                    placeholder="Tanya tentang anomali atau data..."
+                    className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-gray-400"
+                    disabled={isLoading}
+                  />
+                  <div className="flex gap-1">
+                    <button
+                      onClick={handleClear}
+                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Bersihkan chat"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button
+                      onClick={handleSend}
+                      disabled={!input.trim() || isLoading}
+                      title="Kirim pesan"
+                      className={`p-2 rounded-lg transition-all ${
+                        input.trim() && !isLoading
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
-                      {message.timestamp}
-                    </p>
+                      <Send size={18} />
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Input */}
-            <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Type your message..."
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-                <button
-                  onClick={handleSend}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  aria-label="Send message"
-                >
-                  <Send size={20} />
-                </button>
-                <button
-                  onClick={handleClear}
-                  className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  aria-label="Clear chat"
-                >
-                  <Trash2 size={20} />
-                </button>
+                <p className="text-[10px] text-center text-gray-400 mt-2">
+                  GUARD AI can make mistakes. Verify important information.
+                </p>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
     </>
   );
 }
+
 
 // Fallback response generator (used when AI API is unavailable)
 function generateResponse(query: string, data?: SensorData[]): string {
