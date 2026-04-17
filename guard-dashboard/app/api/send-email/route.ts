@@ -17,7 +17,7 @@ async function generatePDFWithPython(anomalyData: any): Promise<Buffer> {
 
     // Call Python to generate PDF
     await execAsync(
-      `cd ${path.join(process.cwd(), '..')} && python3 -c "
+      `cd ${process.cwd()} && python3 -c "
 import json
 import pandas as pd
 from email_notifier import generate_rca_pdf

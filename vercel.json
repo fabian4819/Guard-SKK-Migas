@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd guard-dashboard && npm run build",
+  "outputDirectory": "guard-dashboard/.next",
+  "devCommand": "cd guard-dashboard && npm run dev",
+  "installCommand": "cd guard-dashboard && npm install",
+  "framework": null,
+  "functions": {
+    "guard-dashboard/app/api/**/*.ts": {
+      "maxDuration": 60
+    }
+  }
+}
