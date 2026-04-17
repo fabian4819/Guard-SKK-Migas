@@ -1,53 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as nodemailer from 'nodemailer';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { writeFile, unlink, readFile } from 'fs/promises';
-import path from 'path';
+import { generateRCAPDF } from '@/lib/pdfGenerator';
+import PdfPrinter from 'pdfmake';
 
-const execAsync = promisify(exec);
-
-async function generatePDFWithPython(anomalyData: any): Promise<Buffer> {
-  const tempDataPath = path.join('/tmp', `anomaly_${Date.now()}_${Math.random()}.json`);
-  const tempPdfPath = path.join('/tmp', `rca_${Date.now()}_${Math.random()}.pdf`);
-
-  try {
-    // Write anomaly data to temp file
-    await writeFile(tempDataPath, JSON.stringify(anomalyData));
-
-    // Call Python to generate PDF
-    await execAsync(
-      `cd ${process.cwd()} && python3 -c "
-import json
-import pandas as pd
-from email_notifier import generate_rca_pdf
-
-# Load anomaly data
-with open('${tempDataPath}', 'r') as f:
-    anomaly = json.load(f)
-
-# Convert to pandas Series
-row = pd.Series(anomaly)
-row.name = pd.Timestamp(anomaly['datetime'])
-
-# Generate PDF
-pdf_bytes = generate_rca_pdf(row)
-
-# Write to file
-with open('${tempPdfPath}', 'wb') as f:
-    f.write(pdf_bytes)
-"`,
-      { timeout: 30000 }
-    );
-
-    // Read the generated PDF
-    const pdfBuffer = await readFile(tempPdfPath);
-    return pdfBuffer;
-  } finally {
-    // Clean up temp files
-    await unlink(tempDataPath).catch(() => {});
-    await unlink(tempPdfPath).catch(() => {});
+// Fonts configuration for pdfmake
+const fonts = {
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique'
   }
+};
+
+async function generatePDFBuffer(anomalyData: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const docDefinition = generateRCAPDF(anomalyData);
+      const printer = new PdfPrinter(fonts);
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+
+      const chunks: Buffer[] = [];
+
+      pdfDoc.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      pdfDoc.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+
+      pdfDoc.on('error', (error: Error) => {
+        reject(error);
+      });
+
+      pdfDoc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -95,7 +86,7 @@ export async function POST(request: NextRequest) {
       ? `${new Date(firstAnomaly.datetime).toLocaleTimeString()} - ${new Date(lastAnomaly.datetime).toLocaleTimeString()}`
       : new Date(firstAnomaly.datetime).toLocaleString();
 
-    const anomalySummaryRows = anomalyList.map((anomalyData, index) => {
+    const anomalySummaryRows = anomalyList.map((anomalyData: any, index: number) => {
       const timestamp = new Date(anomalyData.datetime).toLocaleString('en-US', {
         year: 'numeric',
         month: '2-digit',
@@ -197,11 +188,11 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
-    // Generate PDFs using Python (same as dashboard_modern.py)
-    console.log(`📄 Generating ${anomalyList.length} PDF(s) using Python...`);
+    // Generate PDFs using TypeScript/pdfmake
+    console.log(`📄 Generating ${anomalyList.length} PDF(s) using pdfmake...`);
     const pdfAttachments = await Promise.all(
-      anomalyList.map(async (anomalyData, index) => {
-        const pdfBuffer = await generatePDFWithPython(anomalyData);
+      anomalyList.map(async (anomalyData: any, index: number) => {
+        const pdfBuffer = await generatePDFBuffer(anomalyData);
         const timestampStr = new Date(anomalyData.datetime).toISOString().replace(/:/g, '-').substring(0, 19);
         const pdfFilename = `RCA_Report_${index + 1}_${timestampStr}.pdf`;
 
@@ -235,7 +226,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: error?.message || 'Failed to send email',
-        details: error?.stderr || error?.stdout || 'Unknown error'
+        details: error?.stack || 'Unknown error'
       },
       { status: 500 }
     );

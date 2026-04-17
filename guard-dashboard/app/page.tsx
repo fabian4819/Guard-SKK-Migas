@@ -377,33 +377,33 @@ export default function Dashboard() {
         sidebarOpen ? 'ml-80' : 'ml-0'
       }`}>
         {/* Header */}
-        <div className={`px-6 pt-6 pb-4 transition-all duration-300 ${
-          sidebarOpen ? 'pl-6' : 'pl-20'
+        <div className={`px-4 md:px-6 pt-6 pb-4 transition-all duration-300 ${
+          sidebarOpen ? 'lg:pl-6' : 'lg:pl-20'
         }`}>
-          <div className="bg-gradient-to-r from-[#1e3c72] to-[#2a5298] p-6 rounded-xl shadow-md">
-            <h1 className="text-white text-4xl font-black tracking-[0.15em] uppercase"
+          <div className="bg-gradient-to-r from-[#1e3c72] to-[#2a5298] p-4 md:p-6 rounded-xl shadow-md">
+            <h1 className="text-white text-2xl md:text-4xl font-black tracking-[0.15em] uppercase"
                 style={{ textShadow: '3px 3px 8px rgba(0,0,0,0.5)' }}>
               GUARD
             </h1>
-            <p className="text-white text-base mt-2 opacity-95"
+            <p className="text-white text-sm md:text-base mt-2 opacity-95"
                style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.4)' }}>
-              Generative Understanding for Anomaly Response & Detection - Machine Learning Based Early Warning System
+              Generative Understanding for Anomaly Response & Detection - Machine Learning Early Warning System
             </p>
           </div>
         </div>
 
         {/* Divider */}
-        <div className={`px-6 transition-all duration-300 ${
-          sidebarOpen ? 'pl-6' : 'pl-20'
+        <div className={`px-4 md:px-6 transition-all duration-300 ${
+          sidebarOpen ? 'lg:pl-6' : 'lg:pl-20'
         }`}>
           <div className="border-t border-gray-200 my-4"></div>
         </div>
 
         {/* Stats Grid */}
-        <div className={`px-6 pb-6 transition-all duration-300 ${
-          sidebarOpen ? 'pl-6' : 'pl-20'
+        <div className={`px-4 md:px-6 pb-6 transition-all duration-300 ${
+          sidebarOpen ? 'lg:pl-6' : 'lg:pl-20'
         }`}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">
             <StatsCard
               title="Current Time"
               value={stats.currentTime === 'Not Started' ? '2026-04-14\n00:00:21' : stats.currentTime.replace(', ', '\n')}
@@ -438,29 +438,29 @@ export default function Dashboard() {
                 <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-3">
                   <h2 className="text-white font-semibold text-base">Threshold Ratio Analysis</h2>
                 </div>
-                <div className="p-6">
+                <div className="p-3 md:p-6">
                   {/* Stats Cards Row */}
-                  <div className="grid grid-cols-3 gap-6 mb-6">
-                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-4xl font-bold text-[#1e40af] mb-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6 mb-6">
+                    <div className="bg-white p-3 md:p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-2xl md:text-4xl font-bold text-[#1e40af] mb-1 md:mb-2">
                         {currentIndex > 0 ? dataBuffer[dataBuffer.length - 1].threshold_ratio.toFixed(1) : '0.0'}%
                       </p>
                       <p className="text-xs text-gray-600 font-medium">Latest Ratio</p>
                     </div>
-                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-4xl font-bold text-[#dc2626] mb-2">
+                    <div className="bg-white p-3 md:p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-2xl md:text-4xl font-bold text-[#dc2626] mb-1 md:mb-2">
                         {anomalies.length > 0 ? Math.max(...anomalies.map(a => a.threshold_ratio)).toFixed(1) : '0.0'}%
                       </p>
                       <p className="text-xs text-gray-600 font-medium">Highest Ratio</p>
                     </div>
-                    <div className="bg-white p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
-                      <p className="text-5xl font-bold text-[#1e40af] mb-2">{stats.anomaliesDetected}</p>
+                    <div className="bg-white p-3 md:p-5 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                      <p className="text-3xl md:text-5xl font-bold text-[#1e40af] mb-1 md:mb-2">{stats.anomaliesDetected}</p>
                       <p className="text-xs text-gray-600 font-medium">Anomaly Count</p>
                     </div>
                   </div>
 
                   {/* Chart */}
-                  <div className="h-[400px]">
+                  <div className="h-[250px] md:h-[400px]">
                     <MAEChart data={dataBuffer} currentIndex={currentIndex - 1} />
                   </div>
                 </div>
